@@ -1,0 +1,57 @@
+[Version]
+Signature = "$Windows NT$"
+Class = System
+ClassGuid = {4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider = %Author%
+
+[DestinationDirs]
+DefaultDestDir = 12
+Kexec_SysFiles = 12
+Kexec_InfFiles = 10,inf
+
+[SourceDisksNames]
+1 = "Kexec Installation Source Path"
+
+[SourceDisksFiles]
+kexec.sys = 1
+
+[Manufacturer]
+%Author% = Kexec
+
+[Kexec]
+%Description% = DefaultInstall,kexec
+
+[DefaultInstall.NT]
+CopyFiles = Kexec_SysFiles, Kexec_InfFiles
+AddReg = Kexec_RegistryEntries
+
+[DefaultInstall.NT.Services]
+AddService = kexec,,Kexec_Service
+
+[Uninstall.NT]
+DelFiles = Kexec_SysFiles, Kexec_InfFiles
+DelReg = Kexec_RegistryEntries
+
+[Uninstall.NT.Services]
+DelService = kexec,0x00000200
+
+[Kexec_SysFiles]
+kexec.sys
+
+[Kexec_InfFiles]
+kexec.inf
+
+[Kexec_RegistryEntries]
+HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"DisplayName",,%Description%
+HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"UninstallString",0x20000,"rundll32.exe setupapi,InstallHinfSection Uninstall 132 %SystemRoot%\inf\kexec.inf"
+
+[Kexec_Service]
+DisplayName = %Description%
+ServiceType = 1
+StartType = 3
+ErrorControl = 1
+ServiceBinary = %12%\kexec.sys
+
+[Strings]
+Author = "John Stumpo"
+Description = "Kexec Driver"
