@@ -1,0 +1,29 @@
+LANGUAGE 9, 1
+
+1 VERSIONINFO
+ FILEVERSION 1, 0, 0, 0
+ PRODUCTVERSION 1, 0, 0, 0
+ FILEFLAGSMASK 0x3f
+ FILEOS 0x40004
+ FILETYPE 0x3
+ FILESUBTYPE 0x7
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904B0"
+    BEGIN
+      VALUE "CompanyName", "John Stumpo"
+      VALUE "FileDescription", "Kexec Driver"
+      VALUE "FileVersion", "1.0"
+      VALUE "InternalName", "kexec.sys"
+      VALUE "LegalCopyright", L"\251 2008 John Stumpo.  GNU GPL v3 or later."
+      VALUE "OriginalFilename", "kexec.sys"
+      VALUE "ProductName", L"Kexec Implementation for Windows"
+      VALUE "ProductVersion", "1.0"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END
