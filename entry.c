@@ -1,4 +1,43 @@
 #include <ntddk.h>
+#include "kexec.h"
+
+NTSTATUS DDKAPI KexecOpen(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+  Irp->IoStatus.Status = STATUS_SUCCESS;
+  Irp->IoStatus.Information = 0;
+  IoCompleteRequest(Irp, IO_NO_INCREMENT);
+  return STATUS_SUCCESS;
+}
+
+NTSTATUS DDKAPI KexecClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+  Irp->IoStatus.Status = STATUS_SUCCESS;
+  Irp->IoStatus.Information = 0;
+  IoCompleteRequest(Irp, IO_NO_INCREMENT);
+  return STATUS_SUCCESS;
+}
+
+NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+  PIO_STACK_LOCATION IrpStack = IoGetCurrentIrpStackLocation(Irp);
+  NTSTATUS status;
+
+  status = STATUS_SUCCESS;
+
+  switch (IrpStack->Parameters.DeviceIoControl.IoControlCode) {
+    case KEXEC_BSOD:
+      KeBugCheckEx(0x13371337, 0x13371337, 0x13371337, 0x13371337, 0x13371337);
+      break;
+    default:
+      status = STATUS_INVALID_PARAMETER;
+      break;
+  }
+
+  Irp->IoStatus.Status = status;
+  Irp->IoStatus.Information = 0;
+  IoCompleteRequest(Irp, IO_NO_INCREMENT);
+  return status;
+}
 
 void DDKAPI DriverUnload(PDRIVER_OBJECT DriverObject)
 {
@@ -31,6 +70,9 @@ NTSTATUS DDKAPI DriverEntry(PDRIVER_OBJECT DriverObject,
   status = IoCreateDevice(DriverObject, 0, &DeviceName, FILE_DEVICE_UNKNOWN,
     0, FALSE, &DeviceObject);
   if (NT_SUCCESS(status)) {
+    DriverObject->MajorFunction[IRP_MJ_CREATE] = KexecOpen;
+    DriverObject->MajorFunction[IRP_MJ_CLOSE] = KexecClose;
+    DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = KexecIoctl;
     status = IoCreateSymbolicLink(&SymlinkName, &DeviceName);
     if (!NT_SUCCESS(status))
       IoDeleteDevice(DeviceObject);
