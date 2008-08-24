@@ -15,9 +15,9 @@ kexec.exe : kexec.sys kexec.nsi
 	$(MAKENSIS) kexec.nsi
 
 kexec.sys : entry.o version.o
-	$(CC) $(CFLAGS) -s -mno-cygwin -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys entry.o version.o -lntoskrnl
+	$(CC) $(CFLAGS) -s -mno-cygwin -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys entry.o version.o -lntoskrnl -lhal
 
-entry.o : entry.c
+entry.o : entry.c kexec.h
 	$(CC) $(CFLAGS) -c -o entry.o entry.c
 
 version.o : kexec.rc
