@@ -18,7 +18,7 @@ BEGIN
       VALUE "InternalName", "kexec.sys"
       VALUE "LegalCopyright", L"\251 2008 John Stumpo.  GNU GPL v3 or later."
       VALUE "OriginalFilename", "kexec.sys"
-      VALUE "ProductName", L"Kexec Implementation for Windows"
+      VALUE "ProductName", L"WinKexec"
       VALUE "ProductVersion", "1.0"
     END
   END
