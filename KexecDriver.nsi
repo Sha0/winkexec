@@ -1,5 +1,5 @@
 Name Kexec
-OutFile kexec.exe
+OutFile KexecDriver.exe
 
 SetCompressor zlib
 

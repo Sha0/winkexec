@@ -4,21 +4,21 @@ CYGPATH = cygpath
 MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
 WINDRES = windres
 
-all : kexec.exe
+all : KexecDriver.exe
 .PHONY : all
 
 clean :
 	-rm -f *.sys *.o *.exe
 .PHONY : clean
 
-kexec.exe : kexec.sys kexec.nsi kexec.inf
-	$(MAKENSIS) kexec.nsi
+KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf
+	$(MAKENSIS) KexecDriver.nsi
 
-kexec.sys : entry.o version.o
-	$(CC) $(CFLAGS) -s -mno-cygwin -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys entry.o version.o -lntoskrnl -lhal
+kexec.sys : KexecDriver.o KexecDriverResources.o
+	$(CC) $(CFLAGS) -s -mno-cygwin -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys KexecDriver.o KexecDriverResources.o -lntoskrnl -lhal
 
-entry.o : entry.c kexec.h
-	$(CC) $(CFLAGS) -c -o entry.o entry.c
+KexecDriver.o : KexecDriver.c kexec.h
+	$(CC) $(CFLAGS) -c -o KexecDriver.o KexecDriver.c
 
-version.o : kexec.rc
-	$(WINDRES) -o version.o kexec.rc
+KexecDriverResources.o : KexecDriver.rc
+	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
