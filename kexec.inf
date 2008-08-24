@@ -43,7 +43,7 @@ kexec.inf
 
 [Kexec_RegistryEntries]
 HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"DisplayName",,%Description%
-HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"UninstallString",0x20000,"rundll32.exe setupapi,InstallHinfSection Uninstall 132 %SystemRoot%\inf\kexec.inf"
+HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"UninstallString",0x20000,"rundll32.exe setupapi.dll,InstallHinfSection Uninstall 132 %SystemRoot%\inf\kexec.inf"
 
 [Kexec_Service]
 DisplayName = %Description%

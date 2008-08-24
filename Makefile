@@ -11,7 +11,7 @@ clean :
 	-rm -f *.sys *.o *.exe
 .PHONY : clean
 
-kexec.exe : kexec.sys kexec.nsi
+kexec.exe : kexec.sys kexec.nsi kexec.inf
 	$(MAKENSIS) kexec.nsi
 
 kexec.sys : entry.o version.o
