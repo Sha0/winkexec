@@ -22,12 +22,15 @@ MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
 PYTHON = python
 WINDRES = windres
 
-all : KexecDriver.exe kexec.exe
+all : KexecSetup.exe
 .PHONY : all
 
 clean :
 	-rm -f *.sys *.o *.exe *.inf Revision.h Revision.nsh
 .PHONY : clean
+
+KexecSetup.exe : KexecDriver.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
+	$(MAKENSIS) KexecSetup.nsi
 
 KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 	$(MAKENSIS) KexecDriver.nsi

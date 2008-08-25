@@ -26,7 +26,7 @@ SetCompressor zlib
 ShowInstDetails show
 RequestExecutionLevel admin
 
-!define MUI_LICENSEPAGE_CHECKBOX
+!define MUI_LICENSEPAGE_RADIOBUTTONS
 !define MUI_FINISHPAGE_NOAUTOCLOSE
 
 !insertmacro MUI_PAGE_WELCOME
