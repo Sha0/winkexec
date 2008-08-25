@@ -15,14 +15,14 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CC = gcc
-CFLAGS = -g -O2 -W -Wall -I/usr/include/w32api/ddk
+CFLAGS = -g -O2 -W -Wall -mno-cygwin
 CYGPATH = cygpath
 # Assume default install path for NSIS.
 MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
 PYTHON = python
 WINDRES = windres
 
-all : KexecDriver.exe
+all : KexecDriver.exe kexec.exe
 .PHONY : all
 
 clean :
@@ -33,7 +33,7 @@ KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 	$(MAKENSIS) KexecDriver.nsi
 
 kexec.sys : KexecDriver.o KexecDriverResources.o
-	$(CC) $(CFLAGS) -s -mno-cygwin -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys KexecDriver.o KexecDriverResources.o -lntoskrnl -lhal
+	$(CC) $(CFLAGS) -s -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys KexecDriver.o KexecDriverResources.o -lntoskrnl -lhal
 
 KexecDriver.o : KexecDriver.c kexec.h
 	$(CC) $(CFLAGS) -c -o KexecDriver.o KexecDriver.c
@@ -41,7 +41,16 @@ KexecDriver.o : KexecDriver.c kexec.h
 KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
 
+kexec.exe : KexecClient.o KexecClientResources.o
+	$(CC) $(CFLAGS) -s -o kexec.exe KexecClient.o KexecClientResources.o
+
+KexecClient.o : KexecClient.c kexec.h Revision.h
+	$(CC) $(CFLAGS) -c -o KexecClient.o KexecClient.c
+
+KexecClientResources.o : KexecClient.rc Revision.h
+	$(WINDRES) -o KexecClientResources.o KexecClient.rc
+
 Revision.h Revision.nsh kexec.inf : kexec.inf.in FORCE
-	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,LICENSE.txt
+	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,LICENSE.txt,Makefile CLIENT=KexecClient.c,KexecClient.rc,kexec.h,LICENSE.txt,Makefile
 
 FORCE :

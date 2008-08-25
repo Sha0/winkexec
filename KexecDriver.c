@@ -15,7 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <ntddk.h>
+#include <ddk/ntddk.h>
 #include "kexec.h"
 
 typedef struct {
