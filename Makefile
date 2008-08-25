@@ -26,7 +26,7 @@ all : KexecDriver.exe
 .PHONY : all
 
 clean :
-	-rm -f *.sys *.o *.exe Revision.h Revision.nsh
+	-rm -f *.sys *.o *.exe *.inf Revision.h Revision.nsh
 .PHONY : clean
 
 KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
