@@ -14,28 +14,34 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-Name "Kexec Driver"
+!include "Revision.nsh"
+
+!include "MUI2.nsh"
+
+Name "Kexec Driver r${DRIVER_REVISION}"
 OutFile KexecDriver.exe
 
 SetCompressor zlib
 
-XPStyle on
 RequestExecutionLevel admin
-LicenseData LICENSE.txt
-ShowInstDetails show
 
-Page license
-Page instfiles
+!define MUI_LICENSEPAGE_CHECKBOX
 
-VIProductVersion "1.0.0.0"
+!insertmacro MUI_PAGE_WELCOME
+!insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
+!insertmacro MUI_PAGE_INSTFILES
+
+!insertmacro MUI_LANGUAGE "English"
+
+VIProductVersion "1.0.0.${DRIVER_REVISION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "Kexec Driver Setup"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${DRIVER_REVISION})"
 VIAddVersionKey /LANG=1033 "InternalName" "KexecDriver.exe"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008 John Stumpo.  GNU GPL v3 or later."
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecDriver.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${DRIVER_REVISION})"
 
 Section "Kexec"
   SetOutPath $TEMP

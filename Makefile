@@ -19,16 +19,17 @@ CFLAGS = -g -O2 -W -Wall -I/usr/include/w32api/ddk
 CYGPATH = cygpath
 # Assume default install path for NSIS.
 MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
+PYTHON = python
 WINDRES = windres
 
 all : KexecDriver.exe
 .PHONY : all
 
 clean :
-	-rm -f *.sys *.o *.exe
+	-rm -f *.sys *.o *.exe Revision.*h
 .PHONY : clean
 
-KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt
+KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 	$(MAKENSIS) KexecDriver.nsi
 
 kexec.sys : KexecDriver.o KexecDriverResources.o
@@ -37,5 +38,10 @@ kexec.sys : KexecDriver.o KexecDriverResources.o
 KexecDriver.o : KexecDriver.c kexec.h
 	$(CC) $(CFLAGS) -c -o KexecDriver.o KexecDriver.c
 
-KexecDriverResources.o : KexecDriver.rc
+KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
+
+Revision.h Revision.nsh : FORCE
+	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h
+
+FORCE :
