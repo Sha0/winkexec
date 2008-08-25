@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-!include "Revision.nsh"
+!include ".\Revision.nsh"
 
 !include "MUI2.nsh"
 
@@ -23,13 +23,16 @@ OutFile KexecDriver.exe
 
 SetCompressor zlib
 
+ShowInstDetails show
 RequestExecutionLevel admin
 
 !define MUI_LICENSEPAGE_CHECKBOX
+!define MUI_FINISHPAGE_NOAUTOCLOSE
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
 !insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
 

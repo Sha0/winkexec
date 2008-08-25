@@ -60,3 +60,13 @@ if HeaderContent != OldHeaderContent:
 
 if NshContent != OldNshContent:
   open('Revision.nsh', 'w').write(NshContent)
+
+InfContent = open('kexec.inf.in', 'r').read()
+for key, value in MacroList:
+  InfContent = InfContent.replace('@%s@' % key, value)
+try:
+  OldInfContent = open('kexec.inf', 'r').read()
+except IOError:
+  OldInfContent = None
+if InfContent != OldInfContent:
+  open('kexec.inf', 'w').write(InfContent)
