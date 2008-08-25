@@ -42,6 +42,6 @@ KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
 
 Revision.h Revision.nsh kexec.inf : kexec.inf.in FORCE
-	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h
+	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,LICENSE.txt
 
 FORCE :
