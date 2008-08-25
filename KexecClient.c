@@ -26,6 +26,7 @@ BOOL KexecDriverIsLoaded(void)
   SC_HANDLE KexecService;
   SERVICE_STATUS_PROCESS ServiceStatus;
   BOOL retval;
+  DWORD ExtraBytes;
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
@@ -42,7 +43,7 @@ BOOL KexecDriverIsLoaded(void)
   }
 
   if (!QueryServiceStatusEx(KexecService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ServiceStatus,
-    sizeof(ServiceStatus), NULL))
+    sizeof(ServiceStatus), &ExtraBytes))
   {
     fprintf(stderr, "Could not query the kexec service (code %d)\n", GetLastError());
     fprintf(stderr, "(Are you an admin?)\n");
@@ -59,7 +60,43 @@ BOOL KexecDriverIsLoaded(void)
 
 void LoadKexecDriver(void)
 {
+  SC_HANDLE Scm;
+  SC_HANDLE KexecService;
+  SERVICE_STATUS_PROCESS ServiceStatus;
+  BOOL retval;
+  DWORD ExtraBytes;
 
+  if (KexecDriverIsLoaded())
+    return;
+
+  printf("Loading the kexec driver... ");
+
+  Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+  if (!Scm) {
+    fprintf(stderr, "Could not open SCM (code %d)\n", GetLastError());
+    exit(EXIT_FAILURE);
+  }
+
+  KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
+  if (!KexecService) {
+    fprintf(stderr, "Could not open the kexec service (code %d)\n", GetLastError());
+    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
+    CloseServiceHandle(Scm);
+    exit(EXIT_FAILURE);
+  }
+
+  if (!StartService(KexecService, 0, NULL)) {
+    fprintf(stderr, "Could not start the kexec service (code %d)\n", GetLastError());
+    fprintf(stderr, "(Are you an admin?)\n");
+    CloseServiceHandle(KexecService);
+    CloseServiceHandle(Scm);
+    exit(EXIT_FAILURE);
+  }
+
+  CloseServiceHandle(KexecService);
+  CloseServiceHandle(Scm);
+  printf("ok\n");
+  return;
 }
 
 int DoLoad(int argc, char** argv)
@@ -94,8 +131,10 @@ int DoLoad(int argc, char** argv)
 
   if (*(unsigned short*)(kbuf+510) != 0xaa55 ||
     strncmp(kbuf+514, "HdrS", 4) != 0)
+  {
       fprintf(stderr, "warning: This does not look like a Linux kernel.\n");
       fprintf(stderr, "warning: Loading it anyway.\n");
+  }
 
   LoadKexecDriver();
 }
