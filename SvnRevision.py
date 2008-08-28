@@ -28,15 +28,23 @@ def MakeHeader(prefix, macros):
   hdr += '\n%sendif\n' % prefix
   return hdr
 
+RevisionCache = {}
+def GetRevision(filename):
+  if RevisionCache.has_key(filename):
+    return RevisionCache[filename]
+  try:
+    rev = int(os.popen(("svn info '%s' | grep '^Last Changed Rev' | " +
+      "egrep -o '[0-9]+'") % filename.replace("'", "'\"'\"'"), 'r').read())
+  except ValueError:
+    rev = 0
+  RevisionCache[filename] = rev
+  return rev
+
 for arg in sys.argv[1:]:
   key, equals, deps = arg.partition('=')
   highestrev = 0
   for dep in deps.split(','):
-    try:
-      rev = int(os.popen(("svn info '%s' | grep '^Last Changed Rev' | " +
-        "egrep -o '[0-9]+'") % dep.replace("'", "'\"'\"'"), 'r').read())
-    except ValueError:
-      rev = 0
+    rev = GetRevision(dep)
     if rev > highestrev:
       highestrev = rev
   MacroList.append(('%s_REVISION' % key, '%d' % highestrev))
