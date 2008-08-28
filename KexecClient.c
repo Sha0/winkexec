@@ -62,9 +62,6 @@ void LoadKexecDriver(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
-  SERVICE_STATUS_PROCESS ServiceStatus;
-  BOOL retval;
-  DWORD ExtraBytes;
 
   if (KexecDriverIsLoaded())
     return;
@@ -87,6 +84,45 @@ void LoadKexecDriver(void)
 
   if (!StartService(KexecService, 0, NULL)) {
     fprintf(stderr, "Could not start the kexec service (code %d)\n", GetLastError());
+    fprintf(stderr, "(Are you an admin?)\n");
+    CloseServiceHandle(KexecService);
+    CloseServiceHandle(Scm);
+    exit(EXIT_FAILURE);
+  }
+
+  CloseServiceHandle(KexecService);
+  CloseServiceHandle(Scm);
+  printf("ok\n");
+  return;
+}
+
+void UnloadKexecDriver(void)
+{
+  SC_HANDLE Scm;
+  SC_HANDLE KexecService;
+  SERVICE_STATUS ServiceStatus;
+
+  if (!KexecDriverIsLoaded())
+    return;
+
+  printf("Unloading the kexec driver... ");
+
+  Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
+  if (!Scm) {
+    fprintf(stderr, "Could not open SCM (code %d)\n", GetLastError());
+    exit(EXIT_FAILURE);
+  }
+
+  KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
+  if (!KexecService) {
+    fprintf(stderr, "Could not open the kexec service (code %d)\n", GetLastError());
+    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
+    CloseServiceHandle(Scm);
+    exit(EXIT_FAILURE);
+  }
+
+  if (!ControlService(KexecService, SERVICE_CONTROL_STOP, &ServiceStatus)) {
+    fprintf(stderr, "Could not stop the kexec service (code %d)\n", GetLastError());
     fprintf(stderr, "(Are you an admin?)\n");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
@@ -139,6 +175,15 @@ int DoLoad(int argc, char** argv)
   LoadKexecDriver();
 }
 
+int DoUnload(int argc, char** argv)
+{
+  if (KexecDriverIsLoaded())
+    UnloadKexecDriver();
+  else
+    printf("The kexec driver was not loaded; nothing to do.\n");
+  exit(EXIT_SUCCESS);
+}
+
 int DoShow(int argc, char** argv)
 {
   if (!KexecDriverIsLoaded()) {
@@ -167,7 +212,12 @@ Actions:\n\
   /l /load     Load a Linux kernel.\n\
     The next option is the kernel filename.  All subsequent options are\n\
     passed as the kernel command line.  If an initrd= option is given,\n\
-    the named file will be loaded as an initrd.\n\
+    the named file will be loaded as an initrd.  The kexec driver will\n\
+    be loaded automatically if it is not loaded.\n\
+  /u /unload   Unload the kexec driver.  (Naturally, this causes it to\n\
+    forget the currently loaded kernel.)\n\
+  /c /clear    Clear the currently loaded Linux kernel, but leave the\n\
+    kexec driver loaded.\n\
   /s /show     Show current state of kexec.\n\
   /h /? /help  Show this help.\n\
 \n");
@@ -186,6 +236,9 @@ int main(int argc, char** argv)
 
   if (!strcasecmp(argv[1], "/l") || !strcasecmp(argv[1], "/load"))
     action = DoLoad;
+
+  if (!strcasecmp(argv[1], "/u") || !strcasecmp(argv[1], "/unload"))
+    action = DoUnload;
 
   if (!strcasecmp(argv[1], "/s") || !strcasecmp(argv[1], "/show"))
     action = DoShow;

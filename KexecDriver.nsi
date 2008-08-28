@@ -23,11 +23,11 @@ OutFile KexecDriver.exe
 
 SetCompressor zlib
 
-ShowInstDetails show
 RequestExecutionLevel admin
 
-!define MUI_LICENSEPAGE_RADIOBUTTONS
+!define MUI_ABORTWARNING
 !define MUI_FINISHPAGE_NOAUTOCLOSE
+!define MUI_LICENSEPAGE_RADIOBUTTONS
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
@@ -45,6 +45,16 @@ VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008 John Stumpo.  GNU GPL v3 or 
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecDriver.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
 VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${DRIVER_REVISION})"
+
+ShowInstDetails show
+
+Function .onInit
+  System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecDriverInstallerMutex") i .r1 ?e'
+  Pop $R0
+  StrCmp $R0 0 +3
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec Driver Setup is already running." /SD IDOK
+    Abort
+FunctionEnd
 
 Section "Kexec"
   SetOutPath $TEMP

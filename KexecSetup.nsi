@@ -48,7 +48,7 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "1.0.0.${DRIVER_REVISION}"
+VIProductVersion "1.0.0.${CLIENT_REVISION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "WinKexec Setup"
 VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${CLIENT_REVISION})"
@@ -84,7 +84,7 @@ Section "Kexec"
   ExecWait "$\"$INSTDIR\KexecDriver.exe$\" /S"
   WriteUninstaller "$INSTDIR\KexecUninstall.exe"
   WriteRegStr HKLM "Software\WinKexec" InstallRoot $INSTDIR
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec (r${CLIENT_REVISION})"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "UninstallString" "$\"$INSTDIR\KexecUninstall.exe$\""
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "NoModify" 1
