@@ -57,6 +57,6 @@ kexec.inf : kexec.inf.in
 	$(MAKE) Revision.h
 
 Revision.h Revision.nsh : FORCE
-	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,LICENSE.txt,Makefile,SvnRevision.py CLIENT=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,LICENSE.txt,Makefile,SvnRevision.py,KexecClient.c,KexecClient.rc
+	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,Makefile,SvnRevision.py DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi CLIENT=DRIVER,KexecClient.c,KexecClient.rc CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
 
 FORCE :

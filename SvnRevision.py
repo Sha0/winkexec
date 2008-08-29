@@ -49,6 +49,7 @@ for arg in sys.argv[1:]:
       highestrev = rev
   MacroList.append(('%s_REVISION' % key, '%d' % highestrev))
   MacroList.append(('%s_REVISION_STR' % key, '"%d"' % highestrev))
+  RevisionCache[key] = highestrev
 
 HeaderContent = MakeHeader('#', MacroList)
 NshContent = MakeHeader('!', MacroList)

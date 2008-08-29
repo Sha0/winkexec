@@ -48,15 +48,15 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "1.0.0.${CLIENT_REVISION}"
+VIProductVersion "1.0.0.${CLIENT_NSI_REVISION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "WinKexec Setup"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${CLIENT_REVISION})"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${CLIENT_NSI_REVISION})"
 VIAddVersionKey /LANG=1033 "InternalName" "KexecSetup.exe"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008 John Stumpo.  GNU GPL v3 or later."
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecSetup.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${CLIENT_REVISION})"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${CLIENT_NSI_REVISION})"
 
 ShowInstDetails show
 ShowUninstDetails show
@@ -65,7 +65,7 @@ Function .onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "WinKexec Setup is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${CLIENT_REVISION} Setup is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -73,7 +73,7 @@ Function un.onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecUninstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "WinKexec Uninstall is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${CLIENT_REVISION} Uninstall is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -93,8 +93,16 @@ Section "Kexec"
 SectionEnd
 
 Section "Uninstall"
+  ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString"
+  IfErrors NoDriverUninstall
+  ExpandEnvStrings $1 $0
+  ExecWait $1
+  Goto DoneDriverUninstall
+NoDriverUninstall:
+  DetailPrint "Not uninstalling driver because no kexec driver is installed."
+  ClearErrors
+DoneDriverUninstall:
   ${un.EnvVarUpdate} $0 PATH R HKLM $INSTDIR
-  ExecWait "rundll32.exe setupapi.dll,InstallHinfSection Uninstall 132 $WINDIR\inf\kexec.inf"
   Delete $INSTDIR\kexec.exe
   Delete $INSTDIR\KexecDriver.exe
   DeleteRegValue HKLM "Software\WinKexec" InstallRoot
