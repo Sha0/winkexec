@@ -14,17 +14,23 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+; For the strange syntax: don't blame me, blame Microsoft.
+
 [Version]
 Signature = "$Windows NT$"
 Class = System
 ClassGuid = {4D36E97D-E325-11CE-BFC1-08002BE10318}
 Provider = %Author%
 
+; Where stuff goes
 [DestinationDirs]
 DefaultDestDir = 12
+; Drivers into C:\Windows\System32\Drivers
 Kexec_SysFiles = 12
+; This file into C:\Windows\Inf
 Kexec_InfFiles = 10,inf
 
+; <boilerplate>
 [SourceDisksNames]
 1 = "Kexec Installation Source Path"
 
@@ -36,7 +42,9 @@ kexec.sys = 1
 
 [Kexec]
 %Description% = DefaultInstall,kexec
+; </boilerplate>
 
+; The stuff that's done on installation.
 [DefaultInstall.NT]
 CopyFiles = Kexec_SysFiles, Kexec_InfFiles
 AddReg = Kexec_RegistryEntries
@@ -44,6 +52,7 @@ AddReg = Kexec_RegistryEntries
 [DefaultInstall.NT.Services]
 AddService = kexec,,Kexec_Service
 
+; The stuff that's done on uninstallation.
 [Uninstall.NT]
 DelFiles = Kexec_SysFiles, Kexec_InfFiles
 DelReg = Kexec_RegistryEntries
@@ -51,23 +60,32 @@ DelReg = Kexec_RegistryEntries
 [Uninstall.NT.Services]
 DelService = kexec,0x00000200
 
+; Copied to C:\Windows\System32\Drivers
 [Kexec_SysFiles]
 kexec.sys
 
+; Copied to C:\Windows\Inf
 [Kexec_InfFiles]
 kexec.inf
 
+; Added to the Registry - this adds us to Add/Remove Programs
 [Kexec_RegistryEntries]
 HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"DisplayName",,%Description% (r%Revision%)
+; This will call the Uninstall.* sections when we are uninstalled.
 HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"UninstallString",0x20000,"rundll32.exe setupapi.dll,InstallHinfSection Uninstall 132 %SystemRoot%\inf\kexec.inf"
 
+; Register the driver.
 [Kexec_Service]
 DisplayName = %Description%
+; Kernel module
 ServiceType = 1
+; Manually loaded
 StartType = 3
+; Do nothing on error
 ErrorControl = 1
 ServiceBinary = %12%\kexec.sys
 
+; Substitution strings for all above sections
 [Strings]
 Author = "John Stumpo"
 Description = "Kexec Driver"

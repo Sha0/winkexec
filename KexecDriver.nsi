@@ -49,6 +49,7 @@ VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${DRIVER_NSI_REVISION})"
 ShowInstDetails show
 
 Function .onInit
+  # Allow only one instance at a time.
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecDriverInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
@@ -57,10 +58,17 @@ Function .onInit
 FunctionEnd
 
 Section "Kexec"
+  # This really just chains an INF-based install (ugh!) of the driver.
+  # We're just NSISing it so it's a single file.
   SetOutPath $TEMP
   File kexec.sys
   File kexec.inf
+  # Magic incantation to install through an INF file.
+  # (This is the same thing that happens if you right click an INF and hit "Install".)
+  # kexec.inf handles the uninstallation process itself, so we don't do that in NSIS.
   ExecWait "rundll32.exe setupapi.dll,InstallHinfSection DefaultInstall 132 $TEMP\kexec.inf"
+  # The INF install process drops kexec.sys into \windows\system32\drivers
+  # and kexec.inf into \windows\inf, so we don't need these anymore.
   Delete kexec.sys
   Delete kexec.inf
 SectionEnd

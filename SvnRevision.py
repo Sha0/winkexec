@@ -18,8 +18,10 @@
 import os
 import sys
 
+# List of macros to define in the generated header files
 MacroList = []
 
+# Generate a header file and return the contents.
 def MakeHeader(prefix, macros):
   hdr = ('%sifndef REVISION_HEADER\n%sdefine REVISION_HEADER\n\n' %
     (prefix, prefix))
@@ -28,32 +30,47 @@ def MakeHeader(prefix, macros):
   hdr += '\n%sendif\n' % prefix
   return hdr
 
+# Get the svn revision in which a file was last modified.
+# Also works for defined symbols that have already been processed.
 RevisionCache = {}
 def GetRevision(filename):
   if RevisionCache.has_key(filename):
     return RevisionCache[filename]
   try:
+    # XXX: Implement the greps in Python
     rev = int(os.popen(("svn info '%s' | grep '^Last Changed Rev' | " +
       "egrep -o '[0-9]+'") % filename.replace("'", "'\"'\"'"), 'r').read())
   except ValueError:
     rev = 0
+  # Cache it since fork() blows under Cygwin
   RevisionCache[filename] = rev
   return rev
 
+# Go through the list of symbols on the cmdline.
+# They are in the following format: SYMBOL=dep1,dep2,dep3,...
 for arg in sys.argv[1:]:
   key, equals, deps = arg.partition('=')
+  # Get the last modification revision for the
+  # most recently modified listed file or symbol.
   highestrev = 0
   for dep in deps.split(','):
     rev = GetRevision(dep)
     if rev > highestrev:
       highestrev = rev
+  # Set it up to be put into the generated header files.
   MacroList.append(('%s_REVISION' % key, '%d' % highestrev))
   MacroList.append(('%s_REVISION_STR' % key, '"%d"' % highestrev))
+  # Put it into GetRevision()'s cache so one symbol can refer to
+  # another symbol before it rather than everything said symbol contains.
   RevisionCache[key] = highestrev
 
+# Generate a C header and an NSIS header.
 HeaderContent = MakeHeader('#', MacroList)
 NshContent = MakeHeader('!', MacroList)
 
+# Only rewrite the headers if they have changed.
+# (GNU make is smart enough to not rebuild the stuff depending on
+# this even though we force this to run in the makefile.)
 try:
   OldHeaderContent = open('Revision.h', 'r').read()
 except IOError:
@@ -70,6 +87,9 @@ if HeaderContent != OldHeaderContent:
 if NshContent != OldNshContent:
   open('Revision.nsh', 'w').write(NshContent)
 
+# XXX: Make this a cmdline option.
+# Substitute autoconf-style macros (dumbly) so kexec.inf can show
+# the revision in Add/Remove Programs.
 InfContent = open('kexec.inf.in', 'r').read()
 for key, value in MacroList:
   InfContent = InfContent.replace('@%s@' % key, value)

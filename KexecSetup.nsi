@@ -62,6 +62,7 @@ ShowInstDetails show
 ShowUninstDetails show
 
 Function .onInit
+  # Allow only one instance at a time.
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
@@ -70,6 +71,7 @@ Function .onInit
 FunctionEnd
 
 Function un.onInit
+  # Allow only one instance at a time.
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecUninstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
@@ -81,34 +83,50 @@ Section "Kexec"
   SetOutPath $INSTDIR
   File kexec.exe
   File KexecDriver.exe
+  # Install the driver.
   ExecWait "$\"$INSTDIR\KexecDriver.exe$\" /S"
   WriteUninstaller "$INSTDIR\KexecUninstall.exe"
+  # Make our InstallDirRegKey (and thus, the uninstaller!) useful.
   WriteRegStr HKLM "Software\WinKexec" InstallRoot $INSTDIR
+  # Add us to Add/Remove Programs.
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec (r${CLIENT_REVISION})"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "UninstallString" "$\"$INSTDIR\KexecUninstall.exe$\""
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "NoRepair" 1
+  # Add us to the PATH.
   ${EnvVarUpdate} $0 PATH A HKLM $INSTDIR
 SectionEnd
 
 Section "Uninstall"
+  # Unload the driver.
   ExecWait "$\"$INSTDIR\kexec.exe$\" /u"
+  # Figure out how to uninstall the driver (if it's even there...)
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString"
   IfErrors NoDriverUninstall
+  # Remove it by doing what it wrote into the Registry.
   ExpandEnvStrings $1 $0
   ExecWait $1
   Goto DoneDriverUninstall
+  # No driver was installed.
 NoDriverUninstall:
   DetailPrint "Not uninstalling driver because no kexec driver is installed."
   ClearErrors
+  # The driver is not longer on the system.
+  # (Either it wasn't there, or we nuked it ourselves.)
 DoneDriverUninstall:
+  # Remove us from the PATH.
   ${un.EnvVarUpdate} $0 PATH R HKLM $INSTDIR
   Delete $INSTDIR\kexec.exe
   Delete $INSTDIR\KexecDriver.exe
+  # Our InstallDirRegKey is no longer useful.
   DeleteRegValue HKLM "Software\WinKexec" InstallRoot
+  # Kill the Registry key with our settings.
   DeleteRegKey /ifempty HKLM "Software\WinKexec"
+  # Kill the Registry key with our Add/Remove Programs data.
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec"
+  # Kill us!
   Delete "$INSTDIR\KexecUninstall.exe"
+  # And kill the install folder if it's empty.
   RmDir $INSTDIR
 SectionEnd

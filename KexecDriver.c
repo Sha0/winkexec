@@ -24,10 +24,12 @@ typedef struct {
   FAST_MUTEX Mutex;
 } KEXEC_BUFFER, *PKEXEC_BUFFER;
 
+/* Buffers for the data we need to keep track of */
 KEXEC_BUFFER KexecKernel;
 KEXEC_BUFFER KexecInitrd;
 KEXEC_BUFFER KexecKernelCommandLine;
 
+/* Set a buffer to be empty. */
 void KexecInitBuffer(PKEXEC_BUFFER KexecBuffer)
 {
   ExAcquireFastMutex(&KexecBuffer->Mutex);
@@ -36,6 +38,7 @@ void KexecInitBuffer(PKEXEC_BUFFER KexecBuffer)
   ExReleaseFastMutex(&KexecBuffer->Mutex);
 }
 
+/* Free the contents (if any) of a buffer, and reinitialize it. */
 void KexecFreeBuffer(PKEXEC_BUFFER KexecBuffer)
 {
   ExAcquireFastMutex(&KexecBuffer->Mutex);
@@ -45,6 +48,7 @@ void KexecFreeBuffer(PKEXEC_BUFFER KexecBuffer)
   KexecInitBuffer(KexecBuffer);
 }
 
+/* Load data into a buffer. */
 NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data)
 {
   KexecFreeBuffer(KexecBuffer);
@@ -59,6 +63,7 @@ NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data)
   return STATUS_SUCCESS;
 }
 
+/* Retrieve data from a buffer. */
 NTSTATUS KexecGetBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID buf)
 {
   ExAcquireFastMutex(&KexecBuffer->Mutex);
@@ -69,11 +74,13 @@ NTSTATUS KexecGetBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID buf)
   return STATUS_SUCCESS;
 }
 
+/* Get the size of a buffer. */
 ULONG KexecGetBufferSize(PKEXEC_BUFFER KexecBuffer)
 {
   return KexecBuffer->Size;
 }
 
+/* Called when \\.\kexec is opened. */
 NTSTATUS DDKAPI KexecOpen(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
   Irp->IoStatus.Status = STATUS_SUCCESS;
@@ -82,6 +89,7 @@ NTSTATUS DDKAPI KexecOpen(PDEVICE_OBJECT DeviceObject, PIRP Irp)
   return STATUS_SUCCESS;
 }
 
+/* Called when \\.\kexec is closed. */
 NTSTATUS DDKAPI KexecClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
   Irp->IoStatus.Status = STATUS_SUCCESS;
@@ -90,6 +98,7 @@ NTSTATUS DDKAPI KexecClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
   return STATUS_SUCCESS;
 }
 
+/* Handle an ioctl^H^H^H^H^HDeviceIoControl on /dev/^H^H^H^H^H\\.\kexec */
 NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
   PIO_STACK_LOCATION IrpStack = IoGetCurrentIrpStackLocation(Irp);
@@ -101,6 +110,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
   IoctlCode = IrpStack->Parameters.DeviceIoControl.IoControlCode;
 
+  /* Select the buffer we are operating on. */
   switch (IoctlCode & ~KEXEC_OPERATION_MASK) {
     case KEXEC_KERNEL:
       buf = &KexecKernel;
@@ -115,6 +125,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
       status = STATUS_INVALID_PARAMETER;
       goto end;
   }
+  /* Perform the requested operation. */
   switch (IoctlCode & KEXEC_OPERATION_MASK) {
     case KEXEC_SET:
       status = KexecLoadBuffer(buf,
@@ -134,6 +145,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
       goto end;
   }
 
+  /* Return the results. */
 end:
   Irp->IoStatus.Status = status;
   Irp->IoStatus.Information = 0;
@@ -141,16 +153,19 @@ end:
   return status;
 }
 
+/* Called just before kexec.sys is unloaded. */
 void DDKAPI DriverUnload(PDRIVER_OBJECT DriverObject)
 {
   UNICODE_STRING SymlinkName;
 
   DbgPrint("Unloading kexec driver\n");
 
+  /* Unregister \\.\kexec with the Windows kernel. */
   RtlInitUnicodeString(&SymlinkName, L"\\??\\kexec");
   IoDeleteSymbolicLink(&SymlinkName);
   IoDeleteDevice(DriverObject->DeviceObject);
 
+  /* Don't waste kernel memory! */
   KexecFreeBuffer(&KexecKernel);
   KexecFreeBuffer(&KexecInitrd);
   KexecFreeBuffer(&KexecKernelCommandLine);
@@ -158,6 +173,9 @@ void DDKAPI DriverUnload(PDRIVER_OBJECT DriverObject)
   return;
 }
 
+/* The entry point - this is called when kexec.sys is loaded, and it
+   runs to completion before the associated userspace call to
+   StartService() returns, no matter what. */
 NTSTATUS DDKAPI DriverEntry(PDRIVER_OBJECT DriverObject,
   PUNICODE_STRING RegistryPath)
 {
@@ -168,12 +186,15 @@ NTSTATUS DDKAPI DriverEntry(PDRIVER_OBJECT DriverObject,
 
   DbgPrint("Loading kexec driver\n");
 
+  /* Allow kexec.sys to be unloaded. */
   DriverObject->DriverUnload = DriverUnload;
 
+  /* Init the locks on the buffers. */
   ExInitializeFastMutex(&KexecKernel.Mutex);
   ExInitializeFastMutex(&KexecInitrd.Mutex);
   ExInitializeFastMutex(&KexecKernelCommandLine.Mutex);
 
+  /* Init the buffers themselves. */
   KexecInitBuffer(&KexecKernel);
   KexecInitBuffer(&KexecInitrd);
   KexecInitBuffer(&KexecKernelCommandLine);
@@ -181,9 +202,11 @@ NTSTATUS DDKAPI DriverEntry(PDRIVER_OBJECT DriverObject,
   RtlInitUnicodeString(&DeviceName, L"\\Device\\Kexec");
   RtlInitUnicodeString(&SymlinkName, L"\\??\\kexec");
 
+  /* Register \\.\kexec with the Windows kernel. */
   status = IoCreateDevice(DriverObject, 0, &DeviceName, FILE_DEVICE_UNKNOWN,
     0, FALSE, &DeviceObject);
   if (NT_SUCCESS(status)) {
+    /* Set our handlers for I/O operations on \\.\kexec. */
     DriverObject->MajorFunction[IRP_MJ_CREATE] = KexecOpen;
     DriverObject->MajorFunction[IRP_MJ_CLOSE] = KexecClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = KexecIoctl;
