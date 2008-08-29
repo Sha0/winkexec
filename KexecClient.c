@@ -20,6 +20,26 @@
 #include "kexec.h"
 #include "Revision.h"
 
+LPWSTR KexecTranslateError(void)
+{
+  static LPWSTR msgbuf = NULL;
+
+  if (msgbuf) {
+    LocalFree(msgbuf);
+    msgbuf = NULL;
+  }
+
+  FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
+    NULL, GetLastError(), LANG_USER_DEFAULT, &msgbuf, 0, NULL);
+
+  return msgbuf;
+}
+
+void KexecPerror(char * errmsg)
+{
+  fprintf(stderr, "%s: %s", errmsg, KexecTranslateError());
+}
+
 BOOL KexecDriverIsLoaded(void)
 {
   SC_HANDLE Scm;
@@ -30,13 +50,13 @@ BOOL KexecDriverIsLoaded(void)
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
-    fprintf(stderr, "Could not open SCM (code %d)\n", GetLastError());
+    KexecPerror("Could not open SCM");
     exit(EXIT_FAILURE);
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
-    fprintf(stderr, "Could not open the kexec service (code %d)\n", GetLastError());
+    KexecPerror("Could not open the kexec service");
     fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
@@ -45,7 +65,7 @@ BOOL KexecDriverIsLoaded(void)
   if (!QueryServiceStatusEx(KexecService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ServiceStatus,
     sizeof(ServiceStatus), &ExtraBytes))
   {
-    fprintf(stderr, "Could not query the kexec service (code %d)\n", GetLastError());
+    KexecPerror("Could not query the kexec service");
     fprintf(stderr, "(Are you an admin?)\n");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
@@ -70,20 +90,20 @@ void LoadKexecDriver(void)
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
-    fprintf(stderr, "Could not open SCM (code %d)\n", GetLastError());
+    KexecPerror("Could not open SCM");
     exit(EXIT_FAILURE);
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
-    fprintf(stderr, "Could not open the kexec service (code %d)\n", GetLastError());
+    KexecPerror("Could not open the kexec service");
     fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
   }
 
   if (!StartService(KexecService, 0, NULL)) {
-    fprintf(stderr, "Could not start the kexec service (code %d)\n", GetLastError());
+    KexecPerror("Could not start the kexec service");
     fprintf(stderr, "(Are you an admin?)\n");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
@@ -109,20 +129,20 @@ void UnloadKexecDriver(void)
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
-    fprintf(stderr, "Could not open SCM (code %d)\n", GetLastError());
+    KexecPerror("Could not open SCM");
     exit(EXIT_FAILURE);
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
-    fprintf(stderr, "Could not open the kexec service (code %d)\n", GetLastError());
+    KexecPerror("Could not open the kexec service");
     fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
   }
 
   if (!ControlService(KexecService, SERVICE_CONTROL_STOP, &ServiceStatus)) {
-    fprintf(stderr, "Could not stop the kexec service (code %d)\n", GetLastError());
+    KexecPerror("Could not stop the kexec service");
     fprintf(stderr, "(Are you an admin?)\n");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
@@ -137,33 +157,38 @@ void UnloadKexecDriver(void)
 
 int DoLoad(int argc, char** argv)
 {
-  FILE* kernel;
-  int klen = 0;
+  DWORD klen, read_len;
   unsigned char* kbuf;
+  HANDLE kernel;
   HANDLE device;
 
   if (argc < 1) {
-    fprintf(stderr, "Need a kernel to load.\n");
+    if (!KexecDriverIsLoaded())
+      LoadKexecDriver();
+    else
+      printf("The kexec driver was already loaded; nothing to do.\n");
+    exit(EXIT_SUCCESS);
+  }
+
+  if ((kernel = CreateFile(argv[0], GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
+    KexecPerror("Failed to load kernel");
     exit(EXIT_FAILURE);
   }
 
-  if ((kernel = fopen(argv[0], "rb")) == NULL) {
-    perror("Failed to load kernel");
+  if ((klen = GetFileSize(kernel, NULL)) == INVALID_FILE_SIZE) {
+    KexecPerror("Failed to get kernel size");
     exit(EXIT_FAILURE);
   }
 
-  while (!feof(kernel)) {
-    fgetc(kernel);
-    klen++;
-  }
-
-  rewind(kernel);
   if ((kbuf = malloc(klen)) == NULL) {
     perror("Could not allocate buffer for kernel");
     exit(EXIT_FAILURE);
   }
-  fread(kbuf, 1, klen, kernel);
-  fclose(kernel);
+  if (!ReadFile(kernel, kbuf, klen, &read_len, NULL)) {
+    KexecPerror("Could not read kernel");
+    exit(EXIT_FAILURE);
+  }
+  CloseHandle(kernel);
 
   if (*(unsigned short*)(kbuf+510) != 0xaa55 ||
     strncmp(kbuf+514, "HdrS", 4) != 0)
@@ -173,6 +198,13 @@ int DoLoad(int argc, char** argv)
   }
 
   LoadKexecDriver();
+  if ((device = CreateFile("\\\\.\\kexec", GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
+    KexecPerror("Failed to open \\\\.\\kexec");
+    fprintf(stderr, "(Are you an admin?)\n");
+    exit(EXIT_FAILURE);
+  }
+
+  CloseHandle(device);
 }
 
 int DoUnload(int argc, char** argv)
@@ -187,11 +219,11 @@ int DoUnload(int argc, char** argv)
 int DoShow(int argc, char** argv)
 {
   if (!KexecDriverIsLoaded()) {
-    printf("The kexec driver is not loaded.\n");
+    printf("The kexec driver is not loaded.  (Use `kexec /l' to load it.)\n");
     exit(EXIT_FAILURE);
   }
 
-  printf("The kexec driver is active.\n");
+  printf("The kexec driver is active.  (Use `kexec /u' to unload it.)\n");
   exit(EXIT_SUCCESS);
 }
 
@@ -213,9 +245,10 @@ Actions:\n\
     The next option is the kernel filename.  All subsequent options are\n\
     passed as the kernel command line.  If an initrd= option is given,\n\
     the named file will be loaded as an initrd.  The kexec driver will\n\
-    be loaded automatically if it is not loaded.\n\
+    be loaded automatically if it is not loaded.  With no options, just\n\
+    load the kexec driver without loading a kernel.\n\
   /u /unload   Unload the kexec driver.  (Naturally, this causes it to\n\
-    forget the currently loaded kernel.)\n\
+    forget the currently loaded kernel, if any, as well.)\n\
   /c /clear    Clear the currently loaded Linux kernel, but leave the\n\
     kexec driver loaded.\n\
   /s /show     Show current state of kexec.\n\

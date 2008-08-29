@@ -93,6 +93,7 @@ Section "Kexec"
 SectionEnd
 
 Section "Uninstall"
+  ExecWait "$\"$INSTDIR\kexec.exe$\" /u"
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString"
   IfErrors NoDriverUninstall
   ExpandEnvStrings $1 $0
