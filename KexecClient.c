@@ -170,8 +170,10 @@ int DoLoad(int argc, char** argv)
   DWORD klen, ilen, read_len;
   unsigned char* kbuf;
   unsigned char* ibuf = NULL;
+  unsigned char* cmdline = NULL;
   HANDLE kernel, initrd, device;
   int i;
+  DWORD cmdlen = 0;
 
   /* No args: just load the driver and do nothing else. */
   if (argc < 1) {
@@ -233,6 +235,9 @@ int DoLoad(int argc, char** argv)
 
   /* Look for an initrd. */
   for (i = 1; i < argc; i++) {
+    /* While we're parsing the cmdline, also tally up how much RAM we need
+       to hold the final cmdline we send to kexec.sys. */
+    cmdlen += strlen(argv[i]) + 1;
     if (!strncasecmp(argv[i], "initrd=", 7)) {
       printf("Using initrd: %s\n", argv[i]+7);
 
@@ -277,6 +282,23 @@ int DoLoad(int argc, char** argv)
     }
   }
 
+  /* Build the final buffer for the cmdline. */
+  if (cmdlen) {
+    if ((cmdline = malloc(cmdlen+1)) == NULL) {
+      perror("Could not allocate buffer for kernel command line");
+      exit(EXIT_FAILURE);
+    }
+    cmdline[0] = '\0';
+    for (i = 1; i < argc; i++) {
+      strcat(cmdline, argv[i]);
+      strcat(cmdline, " ");
+    }
+    cmdline[strlen(cmdline)-1] = '\0';
+    printf("Kernel command line is: %s\n", cmdline);
+  } else {
+    printf("Kernel command line is blank.\n");
+  }
+
   /* Now let kexec.sys know about it. */
   LoadKexecDriver();
   /* \\.\kexec is the interface to kexec.sys. */
@@ -313,6 +335,16 @@ int DoLoad(int argc, char** argv)
       exit(EXIT_FAILURE);
     }
   }
+
+  printf("Setting kernel command line... ");
+  if (!DeviceIoControl(device, KEXEC_SET | KEXEC_KERNEL_COMMAND_LINE, cmdline, cmdlen, NULL, 0, &read_len, NULL)) {
+    KexecPerror("Could not set kernel command line");
+    CloseHandle(device);
+    exit(EXIT_FAILURE);
+  }
+  if (cmdline)
+    free(cmdline);
+  printf("ok\n");
 
   /* And we're done! */
   CloseHandle(device);
