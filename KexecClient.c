@@ -306,11 +306,16 @@ int DoLoad(int argc, char** argv)
     }
     free(ibuf);
     printf("ok\n");
+  } else {
+    if (!DeviceIoControl(device, KEXEC_SET | KEXEC_INITRD, NULL, 0, NULL, 0, &read_len, NULL)) {
+      KexecPerror("Could not unload initrd from driver");
+      CloseHandle(device);
+      exit(EXIT_FAILURE);
+    }
   }
 
   /* And we're done! */
   CloseHandle(device);
-  printf("ok\n");
 
   exit(EXIT_SUCCESS);
 }
