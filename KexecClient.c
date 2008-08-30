@@ -167,10 +167,11 @@ void UnloadKexecDriver(void)
 /* Handle kexec /l */
 int DoLoad(int argc, char** argv)
 {
-  DWORD klen, read_len;
+  DWORD klen, ilen, read_len;
   unsigned char* kbuf;
-  HANDLE kernel;
-  HANDLE device;
+  unsigned char* ibuf = NULL;
+  HANDLE kernel, initrd, device;
+  int i;
 
   /* No args: just load the driver and do nothing else. */
   if (argc < 1) {
@@ -180,6 +181,8 @@ int DoLoad(int argc, char** argv)
       printf("The kexec driver was already loaded; nothing to do.\n");
     exit(EXIT_SUCCESS);
   }
+
+  printf("Using kernel: %s\n", argv[0]);
 
   /* Read the kernel into a buffer. */
   printf("Reading kernel... ");
@@ -206,7 +209,6 @@ int DoLoad(int argc, char** argv)
   if (!ReadFile(kernel, kbuf, klen, &read_len, NULL)) {
     KexecPerror("Could not read kernel");
     CloseHandle(kernel);
-    free(kbuf);
     exit(EXIT_FAILURE);
   }
   /* ...and close it. */
@@ -218,7 +220,6 @@ int DoLoad(int argc, char** argv)
     fprintf(stderr, "internal error: buffer length mismatch!\n");
     fprintf(stderr, "(" __FILE__ ":%d)\n", __LINE__);
     fprintf(stderr, "please report this to Stump!\n");
-    free(kbuf);
     exit(EXIT_FAILURE);
   }
 
@@ -230,27 +231,85 @@ int DoLoad(int argc, char** argv)
       fprintf(stderr, "warning: Loading it anyway.\n");
   }
 
+  /* Look for an initrd. */
+  for (i = 1; i < argc; i++) {
+    if (!strncasecmp(argv[i], "initrd=", 7)) {
+      printf("Using initrd: %s\n", argv[i]+7);
+
+      /* Read the initrd into a buffer. */
+      printf("Reading initrd... ");
+      /* Open it... */
+      if ((initrd = CreateFile(argv[i]+7, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
+        KexecPerror("Failed to load initrd");
+        exit(EXIT_FAILURE);
+      }
+
+      /* ...get the size... */
+      if ((ilen = GetFileSize(initrd, NULL)) == INVALID_FILE_SIZE) {
+        KexecPerror("Failed to get initrd size");
+        CloseHandle(initrd);
+        exit(EXIT_FAILURE);
+      }
+
+      /* ...grab a buffer... */
+      if ((ibuf = malloc(ilen)) == NULL) {
+        perror("Could not allocate buffer for initrd");
+        CloseHandle(initrd);
+        exit(EXIT_FAILURE);
+      }
+      /* ...read it in... */
+      if (!ReadFile(initrd, ibuf, ilen, &read_len, NULL)) {
+        KexecPerror("Could not read initrd");
+        CloseHandle(initrd);
+        exit(EXIT_FAILURE);
+      }
+      /* ...and close it. */
+      CloseHandle(initrd);
+      printf("ok\n");
+
+      /* Make sure we got all of it. */
+      if (ilen != read_len) {
+        fprintf(stderr, "internal error: buffer length mismatch!\n");
+        fprintf(stderr, "(" __FILE__ ":%d in revision %d)\n", __LINE__, CLIENT_REVISION);
+        fprintf(stderr, "please report this to Stump!\n");
+        exit(EXIT_FAILURE);
+      }
+    }
+  }
+
   /* Now let kexec.sys know about it. */
   LoadKexecDriver();
-  printf("Loading kernel into kexec driver... ");
   /* \\.\kexec is the interface to kexec.sys. */
   if ((device = CreateFile("\\\\.\\kexec", 0, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
     KexecPerror("Failed to open \\\\.\\kexec");
     fprintf(stderr, "(Are you an admin?)\n");
-    free(kbuf);
     exit(EXIT_FAILURE);
   }
 
-  /* Shoot! */
+  /* Do the kernel... */
+  printf("Loading kernel into kexec driver... ");
   if (!DeviceIoControl(device, KEXEC_SET | KEXEC_KERNEL, kbuf, klen, NULL, 0, &read_len, NULL)) {
     KexecPerror("Could not load kernel into driver");
     CloseHandle(device);
-    free(kbuf);
     exit(EXIT_FAILURE);
   }
-  /* And we're done (with the kernel, at least). */
-  CloseHandle(device);
   free(kbuf);
+  printf("ok\n");
+
+  /* ...and the initrd. */
+  if (ibuf) {
+    printf("Loading initrd into kexec driver... ");
+    if (!DeviceIoControl(device, KEXEC_SET | KEXEC_INITRD, ibuf, ilen, NULL, 0, &read_len, NULL)) {
+      KexecPerror("Could not load initrd into driver");
+      CloseHandle(device);
+      exit(EXIT_FAILURE);
+    }
+    free(ibuf);
+    printf("ok\n");
+  }
+
+  /* And we're done! */
+  CloseHandle(device);
   printf("ok\n");
 
   exit(EXIT_SUCCESS);
