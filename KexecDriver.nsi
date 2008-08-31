@@ -59,7 +59,24 @@ FunctionEnd
 
 Section "Kexec"
   # This really just chains an INF-based install (ugh!) of the driver.
-  # We're just NSISing it so it's a single file.
+  # We're just NSISing it so it's a single file and we can pre-uninstall
+  # an existing driver if necessary.
+  # First, check if a driver is already installed, and, if so,
+  # figure out how to uninstall the driver.
+  ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString"
+  IfErrors NoDriverUninstall
+  # Remove it by doing what it wrote into the Registry.
+  DetailPrint "Found an existing kexec driver on the system."
+  DetailPrint "Removing it before installing this one."
+  ExpandEnvStrings $1 $0
+  ExecWait $1
+  Goto DoneDriverUninstall
+  # No driver was installed.
+NoDriverUninstall:
+  ClearErrors
+  # Now no driver is on the system.
+  # (Either it wasn't there, or we nuked it ourselves.)
+DoneDriverUninstall:
   SetOutPath $TEMP
   File kexec.sys
   File kexec.inf

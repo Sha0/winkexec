@@ -80,6 +80,22 @@ Function un.onInit
 FunctionEnd
 
 Section "Kexec"
+  # First, check if WinKexec is already installed, and, if so,
+  # figure out how to uninstall it.
+  ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "UninstallString"
+  IfErrors NoKexecUninstall
+  # Remove it by doing what it wrote into the Registry.
+  DetailPrint "Found an existing installation of WinKexec on the system."
+  DetailPrint "Removing it before installing this one."
+  ExpandEnvStrings $1 $0
+  ExecWait "$1 /S"
+  Goto DoneKexecUninstall
+  # No existing installation.
+NoKexecUninstall:
+  ClearErrors
+  # Now WinKexec is not on the system.
+  # (Either it wasn't there, or we nuked it ourselves.)
+DoneKexecUninstall:
   SetOutPath $INSTDIR
   File kexec.exe
   File KexecDriver.exe
