@@ -22,6 +22,11 @@ MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
 PYTHON = python
 WINDRES = windres
 
+KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverResources.o
+KEXEC_SYS_LIBS    = -lntoskrnl -lhal
+KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o
+KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt -ladvapi32
+
 all : KexecSetup.exe
 .PHONY : all
 
@@ -35,17 +40,20 @@ KexecSetup.exe : KexecDriver.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revis
 KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 	$(MAKENSIS) KexecDriver.nsi
 
-kexec.sys : KexecDriver.o KexecDriverResources.o
-	$(CC) $(CFLAGS) -s -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys KexecDriver.o KexecDriverResources.o -lntoskrnl -lhal
+kexec.sys : $(KEXEC_SYS_OBJECTS)
+	$(CC) $(CFLAGS) -s -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys $(KEXEC_SYS_OBJECTS) $(KEXEC_SYS_LIBS)
 
-KexecDriver.o : KexecDriver.c kexec.h
+KexecDriver.o : KexecDriver.c kexec.h KexecDriverPe.h
 	$(CC) $(CFLAGS) -c -o KexecDriver.o KexecDriver.c
+
+KexecDriverPe.o : KexecDriverPe.c KexecDriverPe.h
+	$(CC) $(CFLAGS) -c -o KexecDriverPe.o KexecDriverPe.c
 
 KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
 
-kexec.exe : KexecClient.o KexecClientResources.o
-	$(CC) $(CFLAGS) -s -o kexec.exe KexecClient.o KexecClientResources.o
+kexec.exe : $(KEXEC_EXE_OBJECTS)
+	$(CC) $(CFLAGS) -s -o kexec.exe $(KEXEC_EXE_OBJECTS) $(KEXEC_EXE_LIBS)
 
 KexecClient.o : KexecClient.c kexec.h Revision.h
 	$(CC) $(CFLAGS) -c -o KexecClient.o KexecClient.c
@@ -57,6 +65,10 @@ kexec.inf : kexec.inf.in
 	$(MAKE) Revision.h
 
 Revision.h Revision.nsh : FORCE
-	$(PYTHON) SvnRevision.py DRIVER=KexecDriver.c,KexecDriver.rc,kexec.h,kexec.inf.in,Makefile,SvnRevision.py DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi CLIENT=DRIVER,KexecClient.c,KexecClient.rc CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
+	$(PYTHON) SvnRevision.py \
+	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriverPe.h,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
+	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
+	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
+	  CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
 
 FORCE :

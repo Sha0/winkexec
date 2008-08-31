@@ -17,6 +17,7 @@
 
 #include <ddk/ntddk.h>
 #include "kexec.h"
+#include "KexecDriverPe.h"
 
 typedef struct {
   ULONG Size;
