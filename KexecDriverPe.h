@@ -20,6 +20,17 @@
 
 #include <ddk/ntddk.h>
 
-PVOID KexecPeReadSystemFile(PCHAR Filename);
+PVOID PeReadSystemFile(PCHAR Filename);
+PIMAGE_NT_HEADERS PeGetNtHeaders(PVOID PeFile);
+PIMAGE_SECTION_HEADER PeGetFirstSectionHeader(PVOID PeFile);
+WORD PeGetSectionCount(PVOID PeFile);
+PIMAGE_SECTION_HEADER PeFindSectionHeaderForAddress(PVOID PeFile, DWORD Address);
+PVOID PeConvertRva(PVOID PeFile, DWORD Rva);
+
+#define PeForEachSectionHeader(PeFile, SectionVariable) \
+  for ((SectionVariable) = PeGetFirstSectionHeader(PeFile); \
+    (SectionVariable) - PeGetFirstSectionHeader(PeFile) < \
+      PeGetSectionCount(PeFile); \
+    (SectionVariable)++)
 
 #endif

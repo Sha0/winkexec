@@ -29,7 +29,7 @@ int _snwprintf(PWCHAR buffer, size_t count, const PWCHAR format, ...);
 /* Read the entirety of a file from system32 into a nonpaged buffer.
    Returns NULL on error.  If a buffer is returned, you must
    call ExFreePool() on it when you are finished with it. */
-PVOID KexecPeReadSystemFile(PCHAR Filename)
+PVOID PeReadSystemFile(PCHAR Filename)
 {
   HANDLE FileHandle;
   NTSTATUS status;
@@ -86,32 +86,68 @@ PVOID KexecPeReadSystemFile(PCHAR Filename)
   return FileReadBuffer;
 }
 
-/* Find the offset to an exported function in a loaded PE file. */
-PVOID KexecPeGetExportedFunction(PCHAR Filename, PCHAR FunctionName)
+/* Return the PIMAGE_NT_HEADERS for a loaded PE file.
+   Returns NULL on error. */
+PIMAGE_NT_HEADERS PeGetNtHeaders(PVOID PeFile)
 {
-  PVOID FileContents;
-  PIMAGE_NT_HEADERS PeHeader;
-  PVOID ExportDirectory;
-
-  /* Read the PE file from disk. */
-  FileContents = KexecPeReadSystemFile(Filename);
-  if (!FileContents)
-    return NULL;
+  PIMAGE_NT_HEADERS PeHeaders;
 
   /* Verify the MZ magic number. */
-  if (((PIMAGE_DOS_HEADER)FileContents)->e_magic != 0x5a4d) {
-    ExFreePool(FileContents);
+  if (((PIMAGE_DOS_HEADER)PeFile)->e_magic != 0x5a4d)
     return NULL;
-  }
 
   /* Get to the PE header.
      Verify the magic number ("PE\0\0") while we're here. */
-  PeHeader = FileContents + ((PIMAGE_DOS_HEADER)FileContents)->e_lfanew;
-  if (PeHeader->Signature != 0x00004550)
-  {
-    ExFreePool(FileContents);
+  PeHeaders = PeFile + ((PIMAGE_DOS_HEADER)PeFile)->e_lfanew;
+  if (PeHeaders->Signature != 0x00004550)
     return NULL;
-  }
 
-  ExportDirectory = &PeHeader->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT];
+  return PeHeaders;
+}
+
+/* Return a pointer to the first PE section header, or NULL on error. */
+PIMAGE_SECTION_HEADER PeGetFirstSectionHeader(PVOID PeFile)
+{
+  if (!PeGetNtHeaders(PeFile))
+    return NULL;
+
+  return (PIMAGE_SECTION_HEADER)(PeGetNtHeaders(PeFile) + 1);
+}
+
+/* Return a the number of PE section headers, or zero on error. */
+WORD PeGetSectionCount(PVOID PeFile)
+{
+  if (!PeGetNtHeaders(PeFile))
+    return 0;
+
+  return PeGetNtHeaders(PeFile)->FileHeader.NumberOfSections;
+}
+
+/* Get the section header for the section that houses the given address. */
+PIMAGE_SECTION_HEADER PeFindSectionHeaderForAddress(PVOID PeFile, DWORD Address)
+{
+  PIMAGE_SECTION_HEADER CurrentSection;
+
+  if (!PeGetNtHeaders(PeFile))
+    return NULL;
+
+  PeForEachSectionHeader(PeFile, CurrentSection) {
+    if (Address >= CurrentSection->VirtualAddress &&
+      Address < CurrentSection->VirtualAddress + CurrentSection->SizeOfRawData)
+        return CurrentSection;
+  }
+  return NULL;
+}
+
+/* Convert a relative virtual address (RVA) into a usable pointer
+   into the raw PE file data. */
+PVOID PeConvertRva(PVOID PeFile, DWORD Rva)
+{
+  PIMAGE_SECTION_HEADER RelevantSection;
+
+  if (!(RelevantSection = PeFindSectionHeaderForAddress(PeFile, Rva)))
+    return NULL;
+
+  return RelevantSection->PointerToRawData - RelevantSection->VirtualAddress +
+    PeFile + Rva;
 }
