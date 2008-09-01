@@ -28,6 +28,8 @@ PIMAGE_SECTION_HEADER PeFindSectionHeaderForAddress(PVOID PeFile, DWORD Address)
 PVOID PeConvertRva(PVOID PeFile, DWORD Rva);
 PIMAGE_EXPORT_DIRECTORY PeGetExportDirectory(PVOID PeFile);
 PIMAGE_IMPORT_DESCRIPTOR PeGetFirstImportDescriptor(PVOID PeFile);
+DWORD PeGetExportFunction(PVOID PeFile, PCHAR FunctionName);
+DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName);
 
 #define PeForEachSectionHeader(PeFile, SectionVariable) \
   for ((SectionVariable) = PeGetFirstSectionHeader(PeFile); \

@@ -179,7 +179,7 @@ PIMAGE_IMPORT_DESCRIPTOR PeGetFirstImportDescriptor(PVOID PeFile)
 }
 
 /* Return the address of an exported function, or NULL on error. */
-PVOID PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
+DWORD PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
 {
   PIMAGE_EXPORT_DIRECTORY ExportDirectory;
   DWORD * Functions;
@@ -187,34 +187,34 @@ PVOID PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
   DWORD i;
 
   if (!(ExportDirectory = PeGetExportDirectory(PeFile)))
-    return NULL;
+    return (DWORD)NULL;
 
   Functions = PeConvertRva(PeFile, ExportDirectory->AddressOfFunctions);
   Names = PeConvertRva(PeFile, ExportDirectory->AddressOfNames);
 
   for (i = 0; i < ExportDirectory->NumberOfFunctions; i++) {
     if (!strcmp(PeConvertRva(PeFile, Names[i]), FunctionName))
-      return (PVOID)Functions[i];
+      return Functions[i];
   }
-  return NULL;
+  return (DWORD)NULL;
 }
 
 /* Return the address of the import pointer, or NULL on error. */
-PVOID PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
+DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
 {
   PIMAGE_IMPORT_DESCRIPTOR ImportDescriptor;
   PIMAGE_THUNK_DATA NameThunk, CallThunk;
   PIMAGE_IMPORT_BY_NAME NamedImport;
 
   if (!(ImportDescriptor = PeGetFirstImportDescriptor(PeFile)))
-    return NULL;
+    return (DWORD)NULL;
 
   while (ImportDescriptor->Name) {
     if (!strcasecmp(PeConvertRva(PeFile, ImportDescriptor->Name), DllName))
       goto FoundDll;
     ImportDescriptor++;
   }
-  return NULL;
+  return (DWORD)NULL;
 
 FoundDll:
   for (NameThunk = PeConvertRva(PeFile, ImportDescriptor->Characteristics),
@@ -223,7 +223,7 @@ FoundDll:
   {
     NamedImport = (PIMAGE_IMPORT_BY_NAME)NameThunk->u1.AddressOfData;
     if (!strcmp(NamedImport->Name, FunctionName))
-      return CallThunk;
+      return CallThunk->u1.Function;
   }
-  return NULL;
+  return (DWORD)NULL;
 }

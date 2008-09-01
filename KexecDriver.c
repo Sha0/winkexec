@@ -18,6 +18,7 @@
 #include <ddk/ntddk.h>
 #include "kexec.h"
 #include "KexecDriverPe.h"
+#include "KexecDriverReboot.h"
 
 typedef struct {
   ULONG Size;
@@ -154,6 +155,15 @@ end:
   return status;
 }
 
+/* Called before shutdown - use this chance to hook HalReturnToFirmware() */
+NTSTATUS DDKAPI KexecShutdown(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+{
+  Irp->IoStatus.Status = KexecHookReboot();
+  Irp->IoStatus.Information = 0;
+  IoCompleteRequest(Irp, IO_NO_INCREMENT);
+  return STATUS_SUCCESS;
+}
+
 /* Called just before kexec.sys is unloaded. */
 void DDKAPI DriverUnload(PDRIVER_OBJECT DriverObject)
 {
@@ -211,8 +221,15 @@ NTSTATUS DDKAPI DriverEntry(PDRIVER_OBJECT DriverObject,
     DriverObject->MajorFunction[IRP_MJ_CREATE] = KexecOpen;
     DriverObject->MajorFunction[IRP_MJ_CLOSE] = KexecClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = KexecIoctl;
+    DriverObject->MajorFunction[IRP_MJ_SHUTDOWN] = KexecShutdown;
     status = IoCreateSymbolicLink(&SymlinkName, &DeviceName);
-    if (!NT_SUCCESS(status))
+    if (NT_SUCCESS(status)) {
+      status = IoRegisterShutdownNotification(DeviceObject);
+      if (!NT_SUCCESS(status)) {
+        IoDeleteSymbolicLink(&SymlinkName);
+        IoDeleteDevice(DeviceObject);
+      }
+    } else
       IoDeleteDevice(DeviceObject);
   }
 

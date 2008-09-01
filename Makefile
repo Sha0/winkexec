@@ -22,7 +22,7 @@ MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
 PYTHON = python
 WINDRES = windres
 
-KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverResources.o
+KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverReboot.o KexecDriverResources.o
 KEXEC_SYS_LIBS    = -lntoskrnl -lhal
 KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o
 KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt -ladvapi32
@@ -43,11 +43,14 @@ KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 kexec.sys : $(KEXEC_SYS_OBJECTS)
 	$(CC) $(CFLAGS) -s -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys $(KEXEC_SYS_OBJECTS) $(KEXEC_SYS_LIBS)
 
-KexecDriver.o : KexecDriver.c kexec.h KexecDriverPe.h
+KexecDriver.o : KexecDriver.c kexec.h KexecDriverReboot.h
 	$(CC) $(CFLAGS) -c -o KexecDriver.o KexecDriver.c
 
 KexecDriverPe.o : KexecDriverPe.c KexecDriverPe.h
 	$(CC) $(CFLAGS) -c -o KexecDriverPe.o KexecDriverPe.c
+
+KexecDriverReboot.o : KexecDriverReboot.c KexecDriverReboot.h KexecDriverPe.h
+	$(CC) $(CFLAGS) -c -o KexecDriverReboot.o KexecDriverReboot.c
 
 KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
@@ -66,7 +69,7 @@ kexec.inf : kexec.inf.in
 
 Revision.h Revision.nsh : FORCE
 	$(PYTHON) SvnRevision.py \
-	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriverPe.h,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
+	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriverPe.h,KexecDriverReboot.c,KexecDriverReboot.h,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
 	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
 	  CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
