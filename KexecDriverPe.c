@@ -140,7 +140,7 @@ PIMAGE_SECTION_HEADER PeFindSectionHeaderForAddress(PVOID PeFile, DWORD Address)
 }
 
 /* Convert a relative virtual address (RVA) into a usable pointer
-   into the raw PE file data. */
+   into the raw PE file data.  Returns NULL on error. */
 PVOID PeConvertRva(PVOID PeFile, DWORD Rva)
 {
   PIMAGE_SECTION_HEADER RelevantSection;
@@ -150,4 +150,80 @@ PVOID PeConvertRva(PVOID PeFile, DWORD Rva)
 
   return RelevantSection->PointerToRawData - RelevantSection->VirtualAddress +
     PeFile + Rva;
+}
+
+/* Return the export directory from a PE file, or NULL on error. */
+PIMAGE_EXPORT_DIRECTORY PeGetExportDirectory(PVOID PeFile)
+{
+  PIMAGE_NT_HEADERS PeHeaders;
+
+  if (!(PeHeaders = PeGetNtHeaders(PeFile)))
+    return NULL;
+
+  return PeConvertRva(PeFile,
+    PeHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);
+}
+
+/* Return the import directory from a PE file, or NULL on error.
+   (This is really the first import descriptor - there is no separate
+   directory, as with the exports.) */
+PIMAGE_IMPORT_DESCRIPTOR PeGetFirstImportDescriptor(PVOID PeFile)
+{
+  PIMAGE_NT_HEADERS PeHeaders;
+
+  if (!(PeHeaders = PeGetNtHeaders(PeFile)))
+    return NULL;
+
+  return PeConvertRva(PeFile,
+    PeHeaders->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT].VirtualAddress);
+}
+
+/* Return the address of an exported function, or NULL on error. */
+PVOID PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
+{
+  PIMAGE_EXPORT_DIRECTORY ExportDirectory;
+  DWORD * Functions;
+  DWORD * Names;
+  DWORD i;
+
+  if (!(ExportDirectory = PeGetExportDirectory(PeFile)))
+    return NULL;
+
+  Functions = PeConvertRva(PeFile, ExportDirectory->AddressOfFunctions);
+  Names = PeConvertRva(PeFile, ExportDirectory->AddressOfNames);
+
+  for (i = 0; i < ExportDirectory->NumberOfFunctions; i++) {
+    if (!strcmp(PeConvertRva(PeFile, Names[i]), FunctionName))
+      return (PVOID)Functions[i];
+  }
+  return NULL;
+}
+
+/* Return the address of the import pointer, or NULL on error. */
+PVOID PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
+{
+  PIMAGE_IMPORT_DESCRIPTOR ImportDescriptor;
+  PIMAGE_THUNK_DATA NameThunk, CallThunk;
+  PIMAGE_IMPORT_BY_NAME NamedImport;
+
+  if (!(ImportDescriptor = PeGetFirstImportDescriptor(PeFile)))
+    return NULL;
+
+  while (ImportDescriptor->Name) {
+    if (!strcasecmp(PeConvertRva(PeFile, ImportDescriptor->Name), DllName))
+      goto FoundDll;
+    ImportDescriptor++;
+  }
+  return NULL;
+
+FoundDll:
+  for (NameThunk = PeConvertRva(PeFile, ImportDescriptor->Characteristics),
+       CallThunk = PeConvertRva(PeFile, ImportDescriptor->FirstThunk);
+    NameThunk->u1.AddressOfData; NameThunk++, CallThunk++)
+  {
+    NamedImport = (PIMAGE_IMPORT_BY_NAME)NameThunk->u1.AddressOfData;
+    if (!strcmp(NamedImport->Name, FunctionName))
+      return CallThunk;
+  }
+  return NULL;
 }
