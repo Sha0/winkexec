@@ -15,7 +15,11 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 CC = gcc
-CFLAGS = -g -O2 -W -Wall -mno-cygwin
+ifdef DEBUG
+CFLAGS = -g3 -O2 -W -Wall -mno-cygwin
+else
+CFLAGS = -s -O2 -W -Wall -mno-cygwin
+endif
 CYGPATH = cygpath
 # Assume default install path for NSIS.
 MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
@@ -41,7 +45,7 @@ KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 	$(MAKENSIS) KexecDriver.nsi
 
 kexec.sys : $(KEXEC_SYS_OBJECTS)
-	$(CC) $(CFLAGS) -s -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys $(KEXEC_SYS_OBJECTS) $(KEXEC_SYS_LIBS)
+	$(CC) $(CFLAGS) -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys $(KEXEC_SYS_OBJECTS) $(KEXEC_SYS_LIBS)
 
 KexecDriver.o : KexecDriver.c kexec.h KexecDriverReboot.h
 	$(CC) $(CFLAGS) -c -o KexecDriver.o KexecDriver.c
@@ -56,7 +60,7 @@ KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
 
 kexec.exe : $(KEXEC_EXE_OBJECTS)
-	$(CC) $(CFLAGS) -s -o kexec.exe $(KEXEC_EXE_OBJECTS) $(KEXEC_EXE_LIBS)
+	$(CC) $(CFLAGS) -o kexec.exe $(KEXEC_EXE_OBJECTS) $(KEXEC_EXE_LIBS)
 
 KexecClient.o : KexecClient.c kexec.h Revision.h
 	$(CC) $(CFLAGS) -c -o KexecClient.o KexecClient.c
