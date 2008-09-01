@@ -88,7 +88,8 @@ Section "Kexec"
   DetailPrint "Found an existing installation of WinKexec on the system."
   DetailPrint "Removing it before installing this one."
   ExpandEnvStrings $1 $0
-  ExecWait "$1 /S"
+  ExecWait "$1 /S _?=$\"$INSTDIR$\""
+  Delete $1
   Goto DoneKexecUninstall
   # No existing installation.
 NoKexecUninstall:
