@@ -32,6 +32,8 @@ NTSTATUS KexecHookReboot(void)
   PVOID KernelBase;
   DWORD ImportOffset;
   PVOID Target;
+  PMDL Mdl;
+  void (*MyMmBuildMdlForNonpagedPool)(PMDL);
 
   if (!(Ntoskrnl = PeReadSystemFile(L"ntoskrnl.exe")))
     return STATUS_INSUFFICIENT_RESOURCES;
@@ -41,20 +43,41 @@ NTSTATUS KexecHookReboot(void)
   KernelBase = IoCreateDevice - PeGetExportFunction(Ntoskrnl, "IoCreateDevice");
   if (KernelBase == IoCreateDevice) {
     ExFreePool(Ntoskrnl);
-    return STATUS_INSUFFICIENT_RESOURCES;
+    return STATUS_UNSUCCESSFUL;
   }
 
   if (!(ImportOffset = PeGetImportPointer(Ntoskrnl, "hal.dll", "HalReturnToFirmware"))) {
     ExFreePool(Ntoskrnl);
-    return STATUS_INSUFFICIENT_RESOURCES;
+    return STATUS_UNSUCCESSFUL;
+  }
+
+  /* Cygwin doesn't have this function... */
+  MyMmBuildMdlForNonpagedPool =
+    KernelBase + PeGetExportFunction(Ntoskrnl, "MmBuildMdlForNonPagedPool");
+  if (MyMmBuildMdlForNonpagedPool == KernelBase) {
+    ExFreePool(Ntoskrnl);
+    return STATUS_UNSUCCESSFUL;
   }
 
   ExFreePool(Ntoskrnl);
 
   Target = KernelBase + ImportOffset;
 
-  /* Here we go! */
+  /* Here we go!
+     We need to unprotect the chunk of RAM the import table is in. */
+  if (!(Mdl = IoAllocateMdl(Target, sizeof(void(**)(void)), FALSE, FALSE, NULL)))
+    return STATUS_UNSUCCESSFUL;
+  MyMmBuildMdlForNonpagedPool(Mdl);
+  Mdl->MdlFlags |= MDL_MAPPED_TO_SYSTEM_VA;
+  if (!(Target = MmMapLockedPagesSpecifyCache(Mdl, KernelMode, MmNonCached,
+    NULL, FALSE, HighPagePriority)))
+  {
+    IoFreeMdl(Mdl);
+    return STATUS_UNSUCCESSFUL;
+  }
   *(void(**)(void))Target = KexecDoReboot;
+  MmUnmapLockedPages(Target, Mdl);
+  IoFreeMdl(Mdl);
 
   return STATUS_SUCCESS;
 }
