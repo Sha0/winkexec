@@ -15,11 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KEXEC_DRIVER_PE_H
-#define KEXEC_DRIVER_PE_H
+#ifndef KEXEC_DRIVER_H
+#define KEXEC_DRIVER_H
 
 #include <ddk/ntddk.h>
 
+/* From KexecDriver.c */
+typedef struct {
+  ULONG Size;
+  PVOID Data;
+  FAST_MUTEX Mutex;
+} KEXEC_BUFFER, *PKEXEC_BUFFER;
+
+/* From KexecDriverPe.c */
 PVOID PeReadSystemFile(PWCHAR Filename);
 PIMAGE_NT_HEADERS PeGetNtHeaders(PVOID PeFile);
 PIMAGE_SECTION_HEADER PeGetFirstSectionHeader(PVOID PeFile);
@@ -36,5 +44,8 @@ DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName);
     (SectionVariable) - PeGetFirstSectionHeader(PeFile) < \
       PeGetSectionCount(PeFile); \
     (SectionVariable)++)
+
+/* From KexecDriverReboot.c */
+NTSTATUS KexecHookReboot(void);
 
 #endif

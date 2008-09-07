@@ -21,7 +21,7 @@
    use these in your own drivers too. */
 
 #include <ddk/ntddk.h>
-#include "KexecDriverPe.h"
+#include "KexecDriver.h"
 
 /* M$ makes you declare it yourself... */
 int _snwprintf(PWCHAR buffer, size_t count, const PWCHAR format, ...);

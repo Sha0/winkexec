@@ -18,8 +18,7 @@
 /* Hook system reboot, and define the stuff needed to handle it. */
 
 #include <ddk/ntddk.h>
-#include "KexecDriverPe.h"
-#include "KexecDriverReboot.h"
+#include "KexecDriver.h"
 
 void KexecDoReboot(void)
 {

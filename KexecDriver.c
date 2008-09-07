@@ -17,14 +17,7 @@
 
 #include <ddk/ntddk.h>
 #include "kexec.h"
-#include "KexecDriverPe.h"
-#include "KexecDriverReboot.h"
-
-typedef struct {
-  ULONG Size;
-  PVOID Data;
-  FAST_MUTEX Mutex;
-} KEXEC_BUFFER, *PKEXEC_BUFFER;
+#include "KexecDriver.h"
 
 /* Buffers for the data we need to keep track of */
 KEXEC_BUFFER KexecKernel;
