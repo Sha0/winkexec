@@ -33,7 +33,7 @@ NTSTATUS KexecHookReboot(void)
   DWORD ImportOffset;
   PVOID Target;
   PMDL Mdl;
-  void (*MyMmBuildMdlForNonpagedPool)(PMDL);
+  void (*MyMmBuildMdlForNonPagedPool)(PMDL);
   int i;
   PWCHAR KernelFilenames[] = {L"ntoskrnl.exe", L"ntkrnlpa.exe",
                               L"ntkrnlmp.exe", L"ntkrpamp.exe", NULL};
@@ -70,9 +70,9 @@ NTSTATUS KexecHookReboot(void)
   }
 
   /* Cygwin doesn't have this function... */
-  MyMmBuildMdlForNonpagedPool =
+  MyMmBuildMdlForNonPagedPool =
     KernelBase + PeGetExportFunction(Ntoskrnl, "MmBuildMdlForNonPagedPool");
-  if (MyMmBuildMdlForNonpagedPool == KernelBase) {
+  if (MyMmBuildMdlForNonPagedPool == KernelBase) {
     ExFreePool(Ntoskrnl);
     return STATUS_UNSUCCESSFUL;
   }
@@ -85,7 +85,7 @@ NTSTATUS KexecHookReboot(void)
      We need to unprotect the chunk of RAM the import table is in. */
   if (!(Mdl = IoAllocateMdl(Target, sizeof(void(**)(void)), FALSE, FALSE, NULL)))
     return STATUS_UNSUCCESSFUL;
-  MyMmBuildMdlForNonpagedPool(Mdl);
+  MyMmBuildMdlForNonPagedPool(Mdl);
   Mdl->MdlFlags |= MDL_MAPPED_TO_SYSTEM_VA;
   if (!(Target = MmMapLockedPagesSpecifyCache(Mdl, KernelMode, MmNonCached,
     NULL, FALSE, HighPagePriority)))
