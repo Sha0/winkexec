@@ -28,23 +28,41 @@ void KexecDoReboot(void)
 
 NTSTATUS KexecHookReboot(void)
 {
-  PVOID Ntoskrnl;
+  PVOID Ntoskrnl = NULL;
   PVOID KernelBase;
   DWORD ImportOffset;
   PVOID Target;
   PMDL Mdl;
   void (*MyMmBuildMdlForNonpagedPool)(PMDL);
+  int i;
+  PWCHAR KernelFilenames[] = {L"ntoskrnl.exe", L"ntkrnlpa.exe",
+                              L"ntkrnlmp.exe", L"ntkrpamp.exe", NULL};
 
-  if (!(Ntoskrnl = PeReadSystemFile(L"ntoskrnl.exe")))
-    return STATUS_INSUFFICIENT_RESOURCES;
+  for (i = 0; KernelFilenames[i]; i++) {
+    if (!(Ntoskrnl = PeReadSystemFile(KernelFilenames[i])))
+      return STATUS_INSUFFICIENT_RESOURCES;
 
-  /* Compute base load address of ntoskrnl.exe by doing this to
-     an arbitrary function from ntoskrnl.exe. */
-  KernelBase = IoCreateDevice - PeGetExportFunction(Ntoskrnl, "IoCreateDevice");
-  if (KernelBase == IoCreateDevice) {
-    ExFreePool(Ntoskrnl);
-    return STATUS_UNSUCCESSFUL;
+    /* Compute base load address of ntoskrnl.exe by doing this to
+       an arbitrary function from ntoskrnl.exe. */
+    KernelBase = KeBugCheckEx - PeGetExportFunction(Ntoskrnl, "KeBugCheckEx");
+    if (KernelBase == KeBugCheckEx) {
+      ExFreePool(Ntoskrnl);
+      Ntoskrnl = NULL;
+      continue;
+    }
+
+    /* Make sure it's right. */
+    if (!MmIsAddressValid(KernelBase) || !PeGetNtHeaders(KernelBase)) {
+      ExFreePool(Ntoskrnl);
+      Ntoskrnl = NULL;
+      continue;
+    }
+
+    break;
   }
+
+  if (!Ntoskrnl)
+    return STATUS_UNSUCCESSFUL;
 
   if (!(ImportOffset = PeGetImportPointer(Ntoskrnl, "hal.dll", "HalReturnToFirmware"))) {
     ExFreePool(Ntoskrnl);
@@ -75,7 +93,7 @@ NTSTATUS KexecHookReboot(void)
     IoFreeMdl(Mdl);
     return STATUS_UNSUCCESSFUL;
   }
-  *(void(**)(void))Target = KexecDoReboot;
+  *(void(**)(void))Target = KexecDoReboot;  /* This is it! */
   MmUnmapLockedPages(Target, Mdl);
   IoFreeMdl(Mdl);
 
