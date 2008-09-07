@@ -33,13 +33,13 @@ NTSTATUS KexecHookReboot(void)
   DWORD ImportOffset;
   PVOID Target;
 
-  if (!(Ntoskrnl = PeReadSystemFile("ntoskrnl.exe")))
+  if (!(Ntoskrnl = PeReadSystemFile(L"ntoskrnl.exe")))
     return STATUS_INSUFFICIENT_RESOURCES;
 
   /* Compute base load address of ntoskrnl.exe by doing this to
      an arbitrary function from ntoskrnl.exe. */
-  KernelBase = KeBugCheckEx - PeGetExportFunction(Ntoskrnl, "KeBugCheckEx");
-  if (KernelBase == KeBugCheckEx) {
+  KernelBase = IoCreateDevice - PeGetExportFunction(Ntoskrnl, "IoCreateDevice");
+  if (KernelBase == IoCreateDevice) {
     ExFreePool(Ntoskrnl);
     return STATUS_INSUFFICIENT_RESOURCES;
   }
@@ -53,6 +53,7 @@ NTSTATUS KexecHookReboot(void)
 
   Target = KernelBase + ImportOffset;
 
+  /* Here we go! */
   *(void(**)(void))Target = KexecDoReboot;
 
   return STATUS_SUCCESS;

@@ -29,7 +29,7 @@ int _snwprintf(PWCHAR buffer, size_t count, const PWCHAR format, ...);
 /* Read the entirety of a file from system32 into a nonpaged buffer.
    Returns NULL on error.  If a buffer is returned, you must
    call ExFreePool() on it when you are finished with it. */
-PVOID PeReadSystemFile(PCHAR Filename)
+PVOID PeReadSystemFile(PWCHAR Filename)
 {
   HANDLE FileHandle;
   NTSTATUS status;
@@ -39,6 +39,7 @@ PVOID PeReadSystemFile(PCHAR Filename)
   IO_STATUS_BLOCK StatusBlock;
   PVOID FileReadBuffer;
   FILE_STANDARD_INFORMATION FileInfo;
+  LARGE_INTEGER FilePointer;
 
   /* More black magic - \SystemRoot goes to the Windows install root. */
   _snwprintf(FullFilenameBuffer, 255, L"\\SystemRoot\\system32\\%s", Filename);
@@ -47,32 +48,40 @@ PVOID PeReadSystemFile(PCHAR Filename)
   InitializeObjectAttributes(&ObjectAttributes, &FullFilename, 0, NULL, NULL);
 
   /* Open the file. */
-  status = ZwOpenFile(&FileHandle, GENERIC_READ, &ObjectAttributes,
-    &StatusBlock, FILE_SHARE_READ, FILE_NON_DIRECTORY_FILE);
+  status = ZwOpenFile(&FileHandle, GENERIC_READ, &ObjectAttributes, &StatusBlock,
+    FILE_SHARE_READ, FILE_NON_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT);
   if (!NT_SUCCESS(status))
     return NULL;
 
   /* Figure out how long it is. */
   status = ZwQueryInformationFile(FileHandle, &StatusBlock, &FileInfo,
     sizeof(FileInfo), FileStandardInformation);
-  if (!NT_SUCCESS(status))
+  if (!NT_SUCCESS(status)) {
+    ZwClose(FileHandle);
     return NULL;
+  }
 
   /* Make sure value is sane. */
-  if (FileInfo.EndOfFile.HighPart)
+  if (FileInfo.EndOfFile.HighPart) {
+    ZwClose(FileHandle);
     return NULL;
+  }
 
   /* Grab a buffer for the file. */
   FileReadBuffer = ExAllocatePoolWithTag(NonPagedPool,
     FileInfo.EndOfFile.LowPart, TAG('K', 'x', 'e', 'c'));
-  if (!FileReadBuffer)
+  if (!FileReadBuffer) {
+    ZwClose(FileHandle);
     return NULL;
+  }
 
   /* Read the file in. */
+  FilePointer.HighPart = FilePointer.LowPart = 0;
   status = ZwReadFile(FileHandle, NULL, NULL, NULL, &StatusBlock,
-    FileReadBuffer, FileInfo.EndOfFile.LowPart, NULL, NULL);
+    FileReadBuffer, FileInfo.EndOfFile.LowPart, &FilePointer, NULL);
   if (!NT_SUCCESS(status)) {
     ExFreePool(FileReadBuffer);
+    ZwClose(FileHandle);
     return NULL;
   }
 
@@ -184,6 +193,7 @@ DWORD PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
   PIMAGE_EXPORT_DIRECTORY ExportDirectory;
   DWORD * Functions;
   DWORD * Names;
+  WORD * Ordinals;
   DWORD i;
 
   if (!(ExportDirectory = PeGetExportDirectory(PeFile)))
@@ -191,10 +201,11 @@ DWORD PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
 
   Functions = PeConvertRva(PeFile, ExportDirectory->AddressOfFunctions);
   Names = PeConvertRva(PeFile, ExportDirectory->AddressOfNames);
+  Ordinals = PeConvertRva(PeFile, ExportDirectory->AddressOfNameOrdinals);
 
   for (i = 0; i < ExportDirectory->NumberOfFunctions; i++) {
     if (!strcmp(PeConvertRva(PeFile, Names[i]), FunctionName))
-      return Functions[i];
+      return Functions[Ordinals[ExportDirectory->Base + i - 1]];
   }
   return (DWORD)NULL;
 }
@@ -217,13 +228,13 @@ DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
   return (DWORD)NULL;
 
 FoundDll:
-  for (NameThunk = PeConvertRva(PeFile, ImportDescriptor->Characteristics),
-       CallThunk = PeConvertRva(PeFile, ImportDescriptor->FirstThunk);
+  for (NameThunk = PeConvertRva(PeFile, ImportDescriptor->OriginalFirstThunk),
+       CallThunk = ImportDescriptor->FirstThunk;
     NameThunk->u1.AddressOfData; NameThunk++, CallThunk++)
   {
-    NamedImport = (PIMAGE_IMPORT_BY_NAME)NameThunk->u1.AddressOfData;
+    NamedImport = PeConvertRva(PeFile, NameThunk->u1.AddressOfData);
     if (!strcmp(NamedImport->Name, FunctionName))
-      return CallThunk->u1.Function;
+      return CallThunk;
   }
   return (DWORD)NULL;
 }

@@ -20,7 +20,7 @@
 
 #include <ddk/ntddk.h>
 
-PVOID PeReadSystemFile(PCHAR Filename);
+PVOID PeReadSystemFile(PWCHAR Filename);
 PIMAGE_NT_HEADERS PeGetNtHeaders(PVOID PeFile);
 PIMAGE_SECTION_HEADER PeGetFirstSectionHeader(PVOID PeFile);
 WORD PeGetSectionCount(PVOID PeFile);
