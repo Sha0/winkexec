@@ -23,10 +23,11 @@ endif
 CYGPATH = cygpath
 # Assume default install path for NSIS.
 MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
+NASM = nasm
 PYTHON = python
 WINDRES = windres
 
-KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverReboot.o KexecDriverResources.o
+KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverReboot.o KexecDriverResources.o KexecLinuxBoot.o
 KEXEC_SYS_LIBS    = -lntoskrnl -lhal
 KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o
 KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt -ladvapi32
@@ -59,6 +60,9 @@ KexecDriverReboot.o : KexecDriverReboot.c KexecDriver.h
 KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
 
+KexecLinuxBoot.o : KexecLinuxBoot.asm
+	$(NASM) -f coff -o KexecLinuxBoot.o KexecLinuxBoot.asm
+
 kexec.exe : $(KEXEC_EXE_OBJECTS)
 	$(CC) $(CFLAGS) -o kexec.exe $(KEXEC_EXE_OBJECTS) $(KEXEC_EXE_LIBS)
 
@@ -73,7 +77,7 @@ kexec.inf : kexec.inf.in
 
 Revision.h Revision.nsh : FORCE
 	$(PYTHON) SvnRevision.py \
-	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
+	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
 	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
 	  CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi

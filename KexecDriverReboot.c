@@ -22,6 +22,10 @@
 
 void KexecDoReboot(void)
 {
+  KexecLinuxBoot();
+  /* Linux boot failed... the only sensible thing is a BSoD (if we can...)
+     If KexecLinuxBoot() has messed things up thoroughly enough, we will likely
+     get a triple fault here, which reboots the machine (for real) anyway... */
   KeBugCheckEx(0x42424242, 0x42424242, 0x42424242, 0x42424242, 0x42424242);
 }
 

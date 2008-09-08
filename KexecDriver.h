@@ -27,6 +27,10 @@ typedef struct {
   FAST_MUTEX Mutex;
 } KEXEC_BUFFER, *PKEXEC_BUFFER;
 
+extern KEXEC_BUFFER KexecKernel;
+extern KEXEC_BUFFER KexecInitrd;
+extern KEXEC_BUFFER KexecKernelCommandLine;
+
 /* From KexecDriverPe.c */
 PVOID PeReadSystemFile(PWCHAR Filename);
 PIMAGE_NT_HEADERS PeGetNtHeaders(PVOID PeFile);
@@ -47,5 +51,13 @@ DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName);
 
 /* From KexecDriverReboot.c */
 NTSTATUS KexecHookReboot(void);
+
+/* From KexecLinuxBoot.asm */
+void KexecLinuxBoot(void);
+extern struct {} KexecLinuxBootRealModeCodeStart;
+extern struct {} KexecLinuxBootRealModeCodeEnd;
+#define KexecLinuxBootRealModeCode KexecLinuxBootRealModeCodeStart
+#define KexecLinuxBootRealModeCodeSize \
+  (KexecLinuxBootRealModeCodeEnd - KexecLinuxBootRealModeCodeStart)
 
 #endif
