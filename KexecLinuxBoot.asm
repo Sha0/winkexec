@@ -110,7 +110,7 @@ _KexecLinuxBoot:
   call dword [__imp__MmGetPhysicalAddress@4]
   test edx,edx
   mov edx,3
-  jnz .bsod  ; possible kexec BSoD #3: address above 4GB in initrd
+  jnz near .bsod  ; possible kexec BSoD #3: address above 4GB in initrd
   stosd
   add ebx,4096
   sub esi,4096
