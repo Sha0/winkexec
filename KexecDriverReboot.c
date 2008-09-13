@@ -36,7 +36,7 @@ NTSTATUS KexecHookReboot(void)
   DWORD ImportOffset;
   PVOID Target;
   PMDL Mdl;
-  void (*MyMmBuildMdlForNonPagedPool)(PMDL);
+  void DDKAPI (*MyMmBuildMdlForNonPagedPool)(PMDL);
   int i;
   PWCHAR KernelFilenames[] = {L"ntoskrnl.exe", L"ntkrnlpa.exe",
                               L"ntkrnlmp.exe", L"ntkrpamp.exe", NULL};

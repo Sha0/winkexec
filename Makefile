@@ -21,8 +21,8 @@ else
 CFLAGS = -s -O2 -W -Wall -mno-cygwin
 endif
 CYGPATH = cygpath
-# Assume default install path for NSIS.
-MAKENSIS = "$(shell $(CYGPATH) "$(PROGRAMFILES)")/NSIS/makensis.exe"
+# Use the Registry to locate the NSIS install path.
+MAKENSIS = "$(shell $(CYGPATH) "$(shell cat /proc/registry/HKEY_LOCAL_MACHINE/SOFTWARE/NSIS/@)")/makensis.exe"
 NASM = nasm
 PYTHON = python
 WINDRES = windres
