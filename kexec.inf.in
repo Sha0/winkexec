@@ -73,6 +73,9 @@ kexec.inf
 HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"DisplayName",,%Description% (r%Revision%)
 ; This will call the Uninstall.* sections when we are uninstalled.
 HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"UninstallString",0x20000,"rundll32.exe setupapi.dll,InstallHinfSection Uninstall 132 %SystemRoot%\inf\kexec.inf"
+; Minor cosmetic fixes on Add/Remove Programs - the only valid operation is removal.
+HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"NoModify",0x10001,1
+HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"NoRepair",0x10001,1
 
 ; Register the driver.
 [Kexec_Service]
