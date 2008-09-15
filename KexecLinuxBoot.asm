@@ -121,78 +121,114 @@ _KexecLinuxBoot:
   stosd
 
   ; And the kernel command line.
-  push dword [_KexecInitrd+4]  ; Pointer
+  push dword [_KexecKernelCommandLine+4]  ; Pointer
   call dword [__imp__MmGetPhysicalAddress@4]
   test edx,edx
   mov edx,4
-  jnz .bsod  ; possible kexec BSoD #4: kernel command line above 4GB
+  jnz near .bsod  ; possible kexec BSoD #4: kernel command line above 4GB
   stosd
-  mov eax,dword [_KexecInitrd]  ; Size
+  mov eax,dword [_KexecKernelCommandLine]  ; Size
   stosd
-
-  ; Find the size of the map.
-  mov ebx,edi
-  sub ebx,dword [ebp-4]  ; The base of the kernel map
 
   ; Find the size of the real-mode code.
-  mov edi,dword [_KexecLinuxBootRealModeCodeEnd]
-  sub edi,dword [_KexecLinuxBootRealModeCodeStart]
+  mov edi,_KexecLinuxBootRealModeCodeEnd
+  sub edi,_KexecLinuxBootRealModeCodeStart
 
   ; Now grab some low RAM for the code below us.
   push dword 0  ; High 32 bits of maximum allowable physical address
   push dword 0x00097fff  ; Low 32 bits
-  push ecx  ; Number of bytes to allocate.
+  push edi  ; Number of bytes to allocate.
   call dword [__imp__MmAllocateContiguousMemory@8]  ; Mapping into eax.
   mov edx,5
   test eax,eax
-  jz .bsod  ; possible kexec BSoD #5: allocating real mode code failed
+  jz near .bsod  ; possible kexec BSoD #5: allocating real mode code failed
+
+  ; Copy the code.
+  push eax
+  mov ebx,edi
+  mov edi,eax
+  mov esi,_KexecLinuxBootRealModeCodeStart
+  mov ecx,ebx
+  rep movsb
+
+  ; Load the offsets we need for quick reference.
+  mov eax,dword [ebp-4]  ; Kernel map
+  pop edi  ; Real mode code
+
+  ; Turn the virtual addresses into physical ones.
+  ; Do the kernel map first.
+  push eax
+  call dword [__imp__MmGetPhysicalAddress@4]
+  mov esi,eax
+
+  ; While the kernel map physical address is in eax and the real mode
+  ; code mapping is in edi, patch in the kernel map offset.
+  ; Note that this intentionally shifts the real code pointer four bytes up!
+  stosd
+
+  ; Now translate the real-mode code pointer.
+  push edi
+  call dword [__imp__MmGetPhysicalAddress@4]
+  mov edi,eax
 
   ; It looks like we are good to go...
   ; let's kick Windows out, return to real mode, and invoke what hopefully
   ; is the code right below us.
 
-  ; Map physical address 0x00000467 so we can
-  ; drop something there for the BIOS's pleasure.
-  ; (I was hoping not to have to call parts of Windows from this file...
-  ; maybe we should add some KeBugCheckEx()es rather than returning
-  ; when errors happen above and below.)
-  push dword 0
-  push dword 4
-  push dword 0
-  push dword 0x00000467
-  call dword [__imp__MmMapIoSpace@16]
-  test eax,eax
-  jz .bsod
+  ; First we have to turn off paging (which is a right mess...)
+  ; We need to have everything ready, for we must jump into a valid
+  ; segment immediately after clearing bit 31 of cr0.  Thankfully we
+  ; can take advantage of prefetching; otherwise we'd be SOL.
 
-  ; Now mangle the flat address into a real-mode far pointer (ugh!)
-  add ebx,4
-  mov ecx,ebx
-  and ebx,0x000f0000
-  shl ebx,12
-  mov bx,cx
+  ; Prepare to load a new GDT and IDT.
+  mov eax,_KexecLinuxBootGdtStart
+  sub eax,_KexecLinuxBootGdtEnd
+  mov word [_KexecLinuxBootGdtSize],ax
+  push dword [_KexecLinuxBootGdtStart]
+  call dword [__imp__MmGetPhysicalAddress@4]
+  test edx,edx
+  mov edx,6
+  jnz .bsod  ; possible kexec BSoD #6: GDT above 4GB
+  mov dword [_KexecLinuxBootGdtPointer],eax
 
-  ; Write the value...
-  mov dword [eax],ebx
+  mov eax,_KexecLinuxBootIdtStart
+  sub eax,_KexecLinuxBootIdtEnd
+  mov word [_KexecLinuxBootIdtSize],ax
+  push dword [_KexecLinuxBootIdtStart]
+  call dword [__imp__MmGetPhysicalAddress@4]
+  test edx,edx
+  mov edx,7
+  jnz .bsod  ; possible kexec BSoD #7: IDT above 4GB
+  mov dword [_KexecLinuxBootIdtPointer],eax
 
-  ; Set up for fallback to real mode through processor reset.
+  ; Now we must patch the EIP the jump below us goes to (ugh!)
+  ; ...fill in stuff here...
 
   ; Abandon all interrupts, ye who execute here!
   cli
 
-  mov al,0x0f
-  out 0x70,al  ; Prepare to access CMOS byte 0x0f
-  nop
-  nop
-  nop
-  nop
-  mov al,0x07
-  out 0x71,al  ; BIOS should just jump to reset vector at 0x00000467.
+  ; Load a simple GDT with just the null seg, a code seg, and a data seg.
+  lgdt [_KexecLinuxBootGdtTag]
+  ; Load a null IDT too.
+  lidt [_KexecLinuxBootIdtTag]
 
-  ; Do the reset.
-  mov al,0xfe
-  out 0x64,al
-  hlt
+  ; Paging, be gone!
+  mov eax,cr0
+  and eax,0x7fffffff
+  mov cr0,eax
 
+  ; Start the stuff in .ftext.
+  ; It's only safe to do this if we do all of the following:
+  ;  - Set CS and EIP at the same time.
+  ;  - Do this immediately after the "mov cr0,eax" that turns paging off.
+  ;  - Something else I'm forgetting.
+  ; Thus we must lay out the instruction ourselves and patch it to the
+  ; physical address that we must jump to.
+  db 0xea  ; Long jump opcode
+  .neweip dd 0
+  .newseg dw 0x0008  ; We don't need to patch this.
+
+  ; Three guesses what this blip of code does...
 .bsod:
   push edx
   push dword 0x42424242
@@ -203,15 +239,34 @@ _KexecLinuxBoot:
   cli
   hlt
 
-; More code! (16-bit this time.) Call it data since that's what it
+; More code! (Still 32-bit.) We jump here after turning off paging and
+; entering flat protected mode; we have it its own section so we don't
+; have to worry about straddling a page boundary.
+section .ftext  ; .text for flat protected mode
+bits 32
+
+_KexecLinuxBootFlatProtectedModeCode:
+
+  ; Reload the segment registers (and stack) so they become flat.
+  xor eax,eax
+  mov ds,ax
+  mov es,ax
+  mov fs,ax
+  mov gs,ax
+  mov ss,ax
+  mov esp,0x00097ffe
+
+  ; This code is a stump.  You can help by expanding it.
+  cli
+  hlt
+
+; Still more code! (16-bit this time.) Call it data since that's what it
 ; is, as far as the 32-bit code is concerned...
 section .rdata
 bits 16
 
 ; Put us into the read-only data section of kexec.sys.  kexec.sys will
 ; copy us to real-mode memory and run us via the above routine.
-
-global _KexecLinuxBootRealModeCodeStart
 _KexecLinuxBootRealModeCodeStart:
   ; Leave four bytes for the kernel map address.
   ; The code that actually calls us will skip it.
@@ -221,5 +276,22 @@ _KexecLinuxBootRealModeCodeStart:
   cli
   hlt
 
-global _KexecLinuxBootRealModeCodeEnd
 _KexecLinuxBootRealModeCodeEnd:
+
+; We'll put our shiny new GDT and IDT in .rdata since they're, well, data.
+_KexecLinuxBootGdtStart:
+_KexecLinuxBootGdtEnd:
+
+_KexecLinuxBootIdtStart:
+_KexecLinuxBootIdtEnd:
+
+; The GDT and IDT pointers, however, go in .bss since we must make them
+; use unknown physical addresses.
+section .bss
+_KexecLinuxBootGdtTag:
+  _KexecLinuxBootGdtSize resw 1
+  _KexecLinuxBootGdtPointer resd 1
+
+_KexecLinuxBootIdtTag:
+  _KexecLinuxBootIdtSize resw 1
+  _KexecLinuxBootIdtPointer resd 1
