@@ -14,6 +14,11 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+; There are probably infinite ways this code can be improved, especially
+; with regard to register usage.  It became the magnificent shambles you
+; see below from various things that were tried and failed.  (Especially
+; with killing paging; I lost count of the number of triple faults...)
+
 ; Code! (32-bit)
 section .text
 bits 32
@@ -23,10 +28,12 @@ extern _KexecKernel
 extern _KexecInitrd
 extern _KexecKernelCommandLine
 
+; Amazingly, we only use these five things from ntoskrnl.exe
 extern __imp__KeBugCheckEx@20
 extern __imp__MmAllocateContiguousMemory@8
 extern __imp__MmGetPhysicalAddress@4
-extern __imp__MmMapIoSpace@16
+extern __imp__MmMapIoSpace@16  ; to be sorely abused below
+extern __imp__MmUnmapIoSpace@8
 
 ; The code that goes back into real mode, then into flat protected mode,
 ; then pulls all the pieces of the kernel back together and boots it.
@@ -164,6 +171,11 @@ _KexecLinuxBoot:
   ; While the kernel map physical address is in eax and the real mode
   ; code mapping is in edi, patch in the kernel map offset.
   ; Note that this intentionally shifts the real code pointer four bytes up!
+  ; We must turn it into a real-mode pointer first (ugh!)
+  mov ecx,eax
+  and eax,0x000f0000
+  shl eax,12
+  mov ax,cx
   stosd
 
   ; Now translate the real-mode code pointer.
@@ -177,32 +189,119 @@ _KexecLinuxBoot:
 
   ; First we have to turn off paging (which is a right mess...)
   ; We need to have everything ready, for we must jump into a valid
-  ; segment immediately after clearing bit 31 of cr0.  Thankfully we
-  ; can take advantage of prefetching; otherwise we'd be SOL.
+  ; segment immediately after clearing bit 31 of cr0.  At least, you
+  ; would think that... unfortunately we can't take advantage of
+  ; prefetching; we're completely, absolutely SOL unless we pull
+  ; some really, really dirty tricks.  (Like the code below.)
 
   ; Prepare to load a new GDT and IDT.
-  mov eax,_KexecLinuxBootGdtStart
-  sub eax,_KexecLinuxBootGdtEnd
+  mov eax,_KexecLinuxBootGdtEnd
+  sub eax,_KexecLinuxBootGdtStart
   mov word [_KexecLinuxBootGdtSize],ax
-  push dword [_KexecLinuxBootGdtStart]
+  push dword _KexecLinuxBootGdtStart
   call dword [__imp__MmGetPhysicalAddress@4]
   test edx,edx
   mov edx,6
-  jnz .bsod  ; possible kexec BSoD #6: GDT above 4GB
+  jnz near .bsod  ; possible kexec BSoD #6: GDT above 4GB
   mov dword [_KexecLinuxBootGdtPointer],eax
 
-  mov eax,_KexecLinuxBootIdtStart
-  sub eax,_KexecLinuxBootIdtEnd
+  mov eax,_KexecLinuxBootIdtEnd
+  sub eax,_KexecLinuxBootIdtStart
   mov word [_KexecLinuxBootIdtSize],ax
-  push dword [_KexecLinuxBootIdtStart]
+  push dword _KexecLinuxBootIdtStart
   call dword [__imp__MmGetPhysicalAddress@4]
   test edx,edx
   mov edx,7
-  jnz .bsod  ; possible kexec BSoD #7: IDT above 4GB
+  jnz near .bsod  ; possible kexec BSoD #7: IDT above 4GB
   mov dword [_KexecLinuxBootIdtPointer],eax
 
   ; Now we must patch the EIP the jump below us goes to (ugh!)
-  ; ...fill in stuff here...
+  ; I would use the MDL method, but I'd sooner die than code that up in
+  ; assembly.  Thus, the Nasty Evil Hack(tm) method.
+  push dword .neweip
+  call dword [__imp__MmGetPhysicalAddress@4]
+  push dword 0  ; Cache enable flag
+  push dword 4  ; Size
+  push edx
+  push eax
+  call dword [__imp__MmMapIoSpace@16]
+  mov edx,8
+  test eax,eax
+  jz near .bsod  ; possible kexec BSoD #8: failed to map jump destination
+  mov ebx,eax
+  push dword _KexecLinuxBootFlatProtectedModeCode
+  call dword [__imp__MmGetPhysicalAddress@4]
+  test edx,edx
+  mov edx,9
+  jnz near .bsod  ; possible kexec BSoD #9: flat protected mode code above 4GB
+  mov dword [ebx],eax  ; Do the patch
+  push eax
+  push dword 4  ; Size
+  push ebx
+  call dword [__imp__MmUnmapIoSpace@8]
+  pop eax
+
+  ; Now to mess directly with the page table and identity-map .ftext.
+  ; Honestly, this could not be more of a PITA.
+  ; To recap the stuff we have squirreled away in registers:
+  ; EAX now has the physical address of .ftext.
+  ; ESI has the physical address of the kernel map.
+  ; EDI has the physical address of the start of the real-mode code.
+  ; Come to think of it, we don't really need the kernel map anymore...
+  mov esi,eax  ; for safe keeping
+
+  ; Map the page directory.
+  mov eax,cr3
+  and eax,0xfffff000
+  push dword 0
+  push dword 0x00001000
+  push dword 0
+  push eax
+  call dword [__imp__MmMapIoSpace@16]
+  mov edx,10
+  test eax,eax
+  jz near .bsod  ; possible kexec BSoD #10: failed to map page directory
+
+  ; Figure out which entry is relevant for us.
+  mov ebx,esi
+  shr ebx,20
+  and ebx,0xfffffffc
+  mov ebx,dword [eax+ebx]  ; Page directory entry (with page table pointer)
+
+  ; Unmap the page directory and map the page table we need.
+  push dword 0x00001000
+  push eax
+  call dword [__imp__MmUnmapIoSpace@8]
+
+  ; Map the page table.
+  mov eax,ebx
+  and eax,0xfffff000
+  push dword 0
+  push dword 0x00001000
+  push dword 0
+  push eax
+  call dword [__imp__MmMapIoSpace@16]
+  mov edx,11
+  test eax,eax
+  jz near .bsod  ; possible kexec BSoD #11: failed to map page table
+
+  ; Scribble in an entry identity-mapping .ftext.
+  mov ebx,esi
+  shr ebx,10
+  and ebx,0x00000ffc
+  mov edx,esi
+  and edx,0xfffff000
+  or edx,0x00000063
+  mov dword [eax+ebx],edx
+  invlpg [esi]  ; Make sure the MMU knows what we did.
+
+  ; Unmap the page table.
+  push dword 0x00001000
+  push eax
+  call dword [__imp__MmUnmapIoSpace@8]
+
+  ; Hop in; we can enter flat protected mode for real once we're there.
+  ; (And we can finally get to the good part...)
 
   ; Abandon all interrupts, ye who execute here!
   cli
@@ -212,16 +311,8 @@ _KexecLinuxBoot:
   ; Load a null IDT too.
   lidt [_KexecLinuxBootIdtTag]
 
-  ; Paging, be gone!
-  mov eax,cr0
-  and eax,0x7fffffff
-  mov cr0,eax
-
   ; Start the stuff in .ftext.
-  ; It's only safe to do this if we do all of the following:
-  ;  - Set CS and EIP at the same time.
-  ;  - Do this immediately after the "mov cr0,eax" that turns paging off.
-  ;  - Something else I'm forgetting.
+  ; We have to set CS and EIP at the same time.
   ; Thus we must lay out the instruction ourselves and patch it to the
   ; physical address that we must jump to.
   db 0xea  ; Long jump opcode
@@ -239,22 +330,30 @@ _KexecLinuxBoot:
   cli
   hlt
 
-; More code! (Still 32-bit.) We jump here after turning off paging and
-; entering flat protected mode; we have it its own section so we don't
-; have to worry about straddling a page boundary.
+; More code! (Still 32-bit.) We identity-map this area and jump here
+; so we can turn off paging and enter flat protected mode; we have it
+; in its own section so we don't have to worry about straddling a
+; page boundary.
 section .ftext  ; .text for flat protected mode
 bits 32
 
 _KexecLinuxBootFlatProtectedModeCode:
 
-  ; Reload the segment registers (and stack) so they become flat.
+  ; Paging, be gone!
+  mov eax,cr0
+  and eax,0x7fffffff
+  mov cr0,eax
   xor eax,eax
+  mov cr3,eax  ; Paging, be very gone.  (Nuke the TLB.)
+
+  ; Reload the segment registers (and stack) so they become flat.
+  mov eax,0x00000010
   mov ds,ax
   mov es,ax
   mov fs,ax
   mov gs,ax
   mov ss,ax
-  mov esp,0x00097ffe
+  mov esp,0x00097ffe  ; Stack accessible in real mode.
 
   ; This code is a stump.  You can help by expanding it.
   cli
@@ -280,6 +379,12 @@ _KexecLinuxBootRealModeCodeEnd:
 
 ; We'll put our shiny new GDT and IDT in .rdata since they're, well, data.
 _KexecLinuxBootGdtStart:
+  ; The obligatory null descriptor.
+  dq 0
+  ; The code segment.
+  dq 0x00cf9a000000ffff
+  ; The data segment.
+  dq 0x00cf92000000ffff
 _KexecLinuxBootGdtEnd:
 
 _KexecLinuxBootIdtStart:
