@@ -193,6 +193,8 @@ _KexecLinuxBoot:
   ; would think that... unfortunately we can't take advantage of
   ; prefetching; we're completely, absolutely SOL unless we pull
   ; some really, really dirty tricks.  (Like the code below.)
+  ; We don't even have one prefetched instruction to work with,
+  ; so there's no getting around it: we must identity-map .ftext.
 
   ; Prepare to load a new GDT and IDT.
   mov eax,_KexecLinuxBootGdtEnd
@@ -215,40 +217,30 @@ _KexecLinuxBoot:
   jnz near .bsod  ; possible kexec BSoD #7: IDT above 4GB
   mov dword [_KexecLinuxBootIdtPointer],eax
 
-  ; Now we must patch the EIP the jump below us goes to (ugh!)
-  ; I would use the MDL method, but I'd sooner die than code that up in
-  ; assembly.  Thus, the Nasty Evil Hack(tm) method.
-  push dword .neweip
-  call dword [__imp__MmGetPhysicalAddress@4]
-  push dword 0  ; Cache enable flag
-  push dword 4  ; Size
-  push edx
-  push eax
-  call dword [__imp__MmMapIoSpace@16]
-  mov edx,8
-  test eax,eax
-  jz near .bsod  ; possible kexec BSoD #8: failed to map jump destination
-  mov ebx,eax
+  ; Now we used to patch the EIP the jump below us goes to (ugh!)
+  ; I would have used the MDL method, but I'd sooner die than code
+  ; that up in assembly.  Thus, the Nasty Evil Hack(tm) method.
+  ; We gutted this, though, except for one side effect that the
+  ; code below relies on.
+  ; (Addendum: is this entire _project_ not a Nasty Evil Hack(tm)?)
   push dword _KexecLinuxBootFlatProtectedModeCode
   call dword [__imp__MmGetPhysicalAddress@4]
   test edx,edx
   mov edx,9
   jnz near .bsod  ; possible kexec BSoD #9: flat protected mode code above 4GB
-  mov dword [ebx],eax  ; Do the patch
-  push eax
-  push dword 4  ; Size
-  push ebx
-  call dword [__imp__MmUnmapIoSpace@8]
-  pop eax
 
   ; Now to mess directly with the page table and identity-map .ftext.
   ; Honestly, this could not be more of a PITA.
+  ; (Needless to say, here be dragons!)
   ; To recap the stuff we have squirreled away in registers:
   ; EAX now has the physical address of .ftext.
   ; ESI has the physical address of the kernel map.
   ; EDI has the physical address of the start of the real-mode code.
   ; Come to think of it, we don't really need the kernel map anymore...
   mov esi,eax  ; for safe keeping
+
+  ; Abandon all interrupts, ye who execute here!
+  cli
 
   ; Map the page directory.
   mov eax,cr3
@@ -266,12 +258,19 @@ _KexecLinuxBoot:
   mov ebx,esi
   shr ebx,20
   and ebx,0xfffffffc
+  or dword [eax+ebx],0x00000063
   mov ebx,dword [eax+ebx]  ; Page directory entry (with page table pointer)
 
   ; Unmap the page directory and map the page table we need.
   push dword 0x00001000
   push eax
   call dword [__imp__MmUnmapIoSpace@8]
+
+  ; XXX: ACTUALLY ALLOCATE A CHUNK OF RAM FOR THE PAGE TABLE!
+  ; We more than likely just treated 0x00000000 as a page table entry,
+  ; so we are about to overwrite four random bytes of the first 4KB of
+  ; physical memory!  (Though we should be good as long as we don't hit
+  ; an interrupt vector Linux needs to boot.)
 
   ; Map the page table.
   mov eax,ebx
@@ -303,21 +302,16 @@ _KexecLinuxBoot:
   ; Hop in; we can enter flat protected mode for real once we're there.
   ; (And we can finally get to the good part...)
 
-  ; Abandon all interrupts, ye who execute here!
-  cli
-
   ; Load a simple GDT with just the null seg, a code seg, and a data seg.
   lgdt [_KexecLinuxBootGdtTag]
   ; Load a null IDT too.
   lidt [_KexecLinuxBootIdtTag]
 
   ; Start the stuff in .ftext.
-  ; We have to set CS and EIP at the same time.
-  ; Thus we must lay out the instruction ourselves and patch it to the
-  ; physical address that we must jump to.
-  db 0xea  ; Long jump opcode
-  .neweip dd 0
-  .newseg dw 0x0008  ; We don't need to patch this.
+  ; The GDT is in limbo right now, but by not touching CS we can get away
+  ; with this.  (This is what makes "unreal" mode possible.)  We pass the
+  ; address of the real-mode code in EDI.
+  jmp esi
 
   ; Three guesses what this blip of code does...
 .bsod:
@@ -354,6 +348,10 @@ _KexecLinuxBootFlatProtectedModeCode:
   mov gs,ax
   mov ss,ax
   mov esp,0x00097ffe  ; Stack accessible in real mode.
+
+  ; We have to somehow manage to make ourselves position-independent.
+  ; We are passed our own address in ESI and the real-mode code address
+  ; in EDI.
 
   ; This code is a stump.  You can help by expanding it.
   cli
