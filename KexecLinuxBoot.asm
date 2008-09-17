@@ -239,6 +239,9 @@ _KexecLinuxBoot:
   ; Come to think of it, we don't really need the kernel map anymore...
   mov esi,eax  ; for safe keeping
 
+  ; XXX: DETECT AND HANDLE PAE!
+  ; Doesn't it use larger page table entries?
+
   ; Abandon all interrupts, ye who execute here!
   cli
 
@@ -333,29 +336,7 @@ bits 32
 
 _KexecLinuxBootFlatProtectedModeCode:
 
-  ; Paging, be gone!
-  mov eax,cr0
-  and eax,0x7fffffff
-  mov cr0,eax
-  xor eax,eax
-  mov cr3,eax  ; Paging, be very gone.  (Nuke the TLB.)
-
-  ; Reload the segment registers (and stack) so they become flat.
-  mov eax,0x00000010
-  mov ds,ax
-  mov es,ax
-  mov fs,ax
-  mov gs,ax
-  mov ss,ax
-  mov esp,0x00097ffe  ; Stack accessible in real mode.
-
-  ; We have to somehow manage to make ourselves position-independent.
-  ; We are passed our own address in ESI and the real-mode code address
-  ; in EDI.
-
-  ; This code is a stump.  You can help by expanding it.
-  cli
-  hlt
+incbin "KexecLinuxBootFlatPmodePart.bin"
 
 ; Still more code! (16-bit this time.) Call it data since that's what it
 ; is, as far as the 32-bit code is concerned...
@@ -365,14 +346,7 @@ bits 16
 ; Put us into the read-only data section of kexec.sys.  kexec.sys will
 ; copy us to real-mode memory and run us via the above routine.
 _KexecLinuxBootRealModeCodeStart:
-  ; Leave four bytes for the kernel map address.
-  ; The code that actually calls us will skip it.
-  KernelMap dd 0
-
-  ; Placeholder!
-  cli
-  hlt
-
+incbin "KexecLinuxBootRealModePart.bin"
 _KexecLinuxBootRealModeCodeEnd:
 
 ; We'll put our shiny new GDT and IDT in .rdata since they're, well, data.

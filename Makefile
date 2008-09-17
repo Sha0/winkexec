@@ -36,7 +36,7 @@ all : KexecSetup.exe
 .PHONY : all
 
 clean :
-	-rm -f *.sys *.o *.exe *.inf Revision.h Revision.nsh
+	-rm -f *.sys *.o *.exe *.inf *.bin Revision.h Revision.nsh
 .PHONY : clean
 
 KexecSetup.exe : KexecDriver.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
@@ -60,8 +60,14 @@ KexecDriverReboot.o : KexecDriverReboot.c KexecDriver.h
 KexecDriverResources.o : KexecDriver.rc Revision.h
 	$(WINDRES) -o KexecDriverResources.o KexecDriver.rc
 
-KexecLinuxBoot.o : KexecLinuxBoot.asm
+KexecLinuxBoot.o : KexecLinuxBoot.asm KexecLinuxBootFlatPmodePart.bin KexecLinuxBootRealModePart.bin
 	$(NASM) -f coff -o KexecLinuxBoot.o KexecLinuxBoot.asm
+
+KexecLinuxBootFlatPmodePart.bin : KexecLinuxBootFlatPmodePart.asm
+	$(NASM) -f bin -o KexecLinuxBootFlatPmodePart.bin KexecLinuxBootFlatPmodePart.asm
+
+KexecLinuxBootRealModePart.bin : KexecLinuxBootRealModePart.asm
+	$(NASM) -f bin -o KexecLinuxBootRealModePart.bin KexecLinuxBootRealModePart.asm
 
 kexec.exe : $(KEXEC_EXE_OBJECTS)
 	$(CC) $(CFLAGS) -o kexec.exe $(KEXEC_EXE_OBJECTS) $(KEXEC_EXE_LIBS)
@@ -77,7 +83,7 @@ kexec.inf : kexec.inf.in
 
 Revision.h Revision.nsh : FORCE
 	$(PYTHON) SvnRevision.py \
-	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
+	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,KexecLinuxBootFlatPmodePart.asm,KexecLinuxBootRealModePart.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
 	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
 	  CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
