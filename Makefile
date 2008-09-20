@@ -75,7 +75,7 @@ kexec.exe : $(KEXEC_EXE_OBJECTS)
 KexecClient.o : KexecClient.c kexec.h Revision.h
 	$(CC) $(CFLAGS) -c -o KexecClient.o KexecClient.c
 
-KexecClientResources.o : KexecClient.rc Revision.h
+KexecClientResources.o : KexecClient.rc Revision.h KexecClientManifest.xml
 	$(WINDRES) -o KexecClientResources.o KexecClient.rc
 
 kexec.inf : kexec.inf.in
@@ -85,7 +85,7 @@ Revision.h Revision.nsh : FORCE
 	$(PYTHON) SvnRevision.py \
 	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,KexecLinuxBootFlatPmodePart.asm,KexecLinuxBootRealModePart.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
-	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
+	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc,KexecClientManifest.xml \
 	  CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
 
 FORCE :

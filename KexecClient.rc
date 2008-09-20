@@ -15,17 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <winver.h>
+
 #include "Revision.h"
 
 LANGUAGE 9, 1
 
-1 VERSIONINFO
+VS_VERSION_INFO VERSIONINFO
  FILEVERSION 1, 0, 0, CLIENT_REVISION
  PRODUCTVERSION 1, 0, 0, CLIENT_REVISION
- FILEFLAGSMASK 0x3f
- FILEOS 0x40004
- FILETYPE 0x3
- FILESUBTYPE 0x7
+ FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_APP
+ FILESUBTYPE VFT2_UNKNOWN
 BEGIN
   BLOCK "StringFileInfo"
   BEGIN
@@ -46,3 +48,5 @@ BEGIN
     VALUE "Translation", 0x409, 1200
   END
 END
+
+2 RT_MANIFEST "KexecClientManifest.xml"
