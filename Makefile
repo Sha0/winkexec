@@ -31,6 +31,8 @@ KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverReboot.o KexecDrive
 KEXEC_SYS_LIBS    = -lntoskrnl -lhal
 KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o
 KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt -ladvapi32
+KEXEC_GUI_OBJECTS = KexecGui.o KexecGuiResources.o
+KEXEC_GUI_LIBS    = -lkernel32 -lmsvcrt -ladvapi32 -luser32
 
 all : KexecSetup.exe
 .PHONY : all
@@ -39,7 +41,7 @@ clean :
 	-rm -f *.sys *.o *.exe *.inf *.bin Revision.h Revision.nsh
 .PHONY : clean
 
-KexecSetup.exe : KexecDriver.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
+KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
 	$(MAKENSIS) KexecSetup.nsi
 
 KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
@@ -78,6 +80,15 @@ KexecClient.o : KexecClient.c kexec.h Revision.h
 KexecClientResources.o : KexecClient.rc Revision.h KexecClientManifest.xml Kexec.ico
 	$(WINDRES) -o KexecClientResources.o KexecClient.rc
 
+KexecGui.exe : $(KEXEC_GUI_OBJECTS)
+	$(CC) -mwindows $(CFLAGS) -o KexecGui.exe $(KEXEC_GUI_OBJECTS) $(KEXEC_GUI_LIBS)
+
+KexecGui.o : KexecGui.c kexec.h Revision.h
+	$(CC) $(CFLAGS) -c -o KexecGui.o KexecGui.c
+
+KexecGuiResources.o : KexecGui.rc Revision.h KexecClientManifest.xml Kexec.ico
+	$(WINDRES) -o KexecGuiResources.o KexecGui.rc
+
 kexec.inf : kexec.inf.in
 	$(MAKE) Revision.h
 
@@ -86,6 +97,7 @@ Revision.h Revision.nsh : FORCE
 	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,KexecLinuxBootFlatPmodePart.asm,KexecLinuxBootRealModePart.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
 	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc,KexecClientManifest.xml,Kexec.ico \
-	  CLIENT_NSI=CLIENT,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
+	  GUI=CLIENT,KexecGui.c,KexecGui.rc \
+	  CLIENT_NSI=CLIENT,GUI,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
 
 FORCE :

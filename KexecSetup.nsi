@@ -99,6 +99,7 @@ NoKexecUninstall:
 DoneKexecUninstall:
   SetOutPath $INSTDIR
   File kexec.exe
+  File KexecGui.exe
   File KexecDriver.exe
   # Install the driver.
   ExecWait "$\"$INSTDIR\KexecDriver.exe$\" /S"
@@ -135,6 +136,7 @@ DoneDriverUninstall:
   # Remove us from the PATH.
   ${un.EnvVarUpdate} $0 PATH R HKLM $INSTDIR
   Delete $INSTDIR\kexec.exe
+  Delete $INSTDIR\KexecGui.exe
   Delete $INSTDIR\KexecDriver.exe
   # Our InstallDirRegKey is no longer useful.
   DeleteRegValue HKLM "Software\WinKexec" InstallRoot
