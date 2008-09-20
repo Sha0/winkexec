@@ -50,3 +50,5 @@ BEGIN
 END
 
 2 RT_MANIFEST "KexecClientManifest.xml"
+
+1 ICON "Kexec.ico"
