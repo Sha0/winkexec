@@ -32,7 +32,7 @@ KEXEC_SYS_LIBS    = -lntoskrnl -lhal
 KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o
 KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt -ladvapi32
 KEXEC_GUI_OBJECTS = KexecGui.o KexecGuiResources.o
-KEXEC_GUI_LIBS    = -lkernel32 -lmsvcrt -ladvapi32 -luser32
+KEXEC_GUI_LIBS    = -lkernel32 -lmsvcrt -ladvapi32 -luser32 -lcomctl32
 
 all : KexecSetup.exe
 .PHONY : all
@@ -77,7 +77,7 @@ kexec.exe : $(KEXEC_EXE_OBJECTS)
 KexecClient.o : KexecClient.c kexec.h Revision.h
 	$(CC) $(CFLAGS) -c -o KexecClient.o KexecClient.c
 
-KexecClientResources.o : KexecClient.rc Revision.h KexecClientManifest.xml Kexec.ico
+KexecClientResources.o : KexecClient.rc Revision.h
 	$(WINDRES) -o KexecClientResources.o KexecClient.rc
 
 KexecGui.exe : $(KEXEC_GUI_OBJECTS)
@@ -86,7 +86,7 @@ KexecGui.exe : $(KEXEC_GUI_OBJECTS)
 KexecGui.o : KexecGui.c kexec.h Revision.h
 	$(CC) $(CFLAGS) -c -o KexecGui.o KexecGui.c
 
-KexecGuiResources.o : KexecGui.rc Revision.h KexecClientManifest.xml Kexec.ico
+KexecGuiResources.o : KexecGui.rc Revision.h KexecGuiManifest.xml Kexec.ico
 	$(WINDRES) -o KexecGuiResources.o KexecGui.rc
 
 kexec.inf : kexec.inf.in
@@ -96,8 +96,8 @@ Revision.h Revision.nsh : FORCE
 	$(PYTHON) SvnRevision.py \
 	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,KexecLinuxBootFlatPmodePart.asm,KexecLinuxBootRealModePart.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
-	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc,KexecClientManifest.xml,Kexec.ico \
-	  GUI=CLIENT,KexecGui.c,KexecGui.rc \
+	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
+	  GUI=DRIVER,KexecGui.c,KexecGui.rc,KexecGuiManifest.xml,Kexec.ico \
 	  CLIENT_NSI=CLIENT,GUI,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
 
 FORCE :

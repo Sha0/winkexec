@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <winuser.h>
 #include <winver.h>
 
 #include "Revision.h"
@@ -48,7 +49,3 @@ BEGIN
     VALUE "Translation", 0x409, 1200
   END
 END
-
-2 RT_MANIFEST "KexecClientManifest.xml"
-
-1 ICON "Kexec.ico"

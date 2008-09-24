@@ -15,6 +15,7 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <winuser.h>
 #include <winver.h>
 
 #include "Revision.h"
@@ -49,6 +50,6 @@ BEGIN
   END
 END
 
-2 RT_MANIFEST "KexecClientManifest.xml"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "KexecGuiManifest.xml"
 
 1 ICON "Kexec.ico"

@@ -70,6 +70,8 @@ _KexecLinuxBoot:
   add ecx,12  ; Terminator, cmdline pointer, cmdline length.
 
   ; Grab a chunk of RAM.
+  ; XXX: Figure out why Vista always BSoDs here
+  ; (from the function call failing, we know that much...)
   push dword 0  ; High 32 bits of maximum allowable physical address
   push dword 0x00097fff  ; Low 32 bits
   push ecx  ; Number of bytes to allocate.
