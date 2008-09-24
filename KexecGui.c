@@ -19,6 +19,8 @@
 #include <windows.h>
 #include <commctrl.h>
 
+#include "KexecGuiResources.h"
+
 HINSTANCE hInst;
 
 /* Convenient wrapper around FormatMessage() and GetLastError() */
@@ -75,11 +77,42 @@ void KexecPerror(char * errmsg)
     errmsg, KexecTranslateError());
 }
 
+void KexecThisProgramIsAStump(void)
+{
+  MessageBox(NULL, "This program is a stump.  You can help by expanding it.",
+    "WinKexec GUI", MB_ICONERROR | MB_OK);
+}
+
+/* The processing routine for the main dialog. */
+BOOL CALLBACK KexecGuiMainDlgProc(HWND hDlg, UINT msg,
+  WPARAM wParam, LPARAM lParam)
+{
+  switch (msg) {
+    case WM_INITDIALOG:
+      KexecThisProgramIsAStump();
+      break;
+    case WM_DESTROY:
+      PostQuitMessage(0);
+      break;
+    case WM_CLOSE:
+      DestroyWindow(hDlg);
+      break;
+    default:
+      return FALSE;
+  }
+  return TRUE;
+}
+
+/* The entry point. */
 int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev,
   LPSTR cmdline, int winstyle)
 {
   INITCOMMONCONTROLSEX initComCtlEx;
+  HWND hDlg;
+  MSG msg;
+  DWORD status;
 
+  /* Go XP style. */
   initComCtlEx.dwSize = sizeof(INITCOMMONCONTROLSEX);
   initComCtlEx.dwICC = ICC_COOL_CLASSES;
   if (!InitCommonControlsEx(&initComCtlEx)) {
@@ -87,9 +120,23 @@ int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev,
     exit(EXIT_FAILURE);
   }
 
+  /* Set our hInstance aside for a rainy day. */
   hInst = in_hInst;
 
-  MessageBox(NULL, "This program is a stump.  You can help by expanding it.",
-    "WinKexec GUI", MB_ICONERROR | MB_OK);
-  exit(EXIT_SUCCESS);
+  /* Load the main window. */
+  hDlg = CreateDialog(hInst, MAKEINTRESOURCE(KEXEC_GUI_MAIN_DLG),
+    0, KexecGuiMainDlgProc);
+  if (!hDlg) {
+    KexecPerror("CreateDialog");
+    exit(EXIT_FAILURE);
+  }
+
+  /* Now for the main loop. */
+  while ((status = GetMessage(&msg, 0, 0, 0)) > 0) {
+    if (!IsDialogMessage(hDlg, &msg)) {
+      TranslateMessage(&msg);
+      DispatchMessage(&msg);
+    }
+  }
+  return msg.wParam;
 }

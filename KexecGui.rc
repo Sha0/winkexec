@@ -18,6 +18,8 @@
 #include <winuser.h>
 #include <winver.h>
 
+#include "KexecGuiResources.h"
+
 #include "Revision.h"
 
 LANGUAGE 9, 1
@@ -53,3 +55,11 @@ END
 CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "KexecGuiManifest.xml"
 
 1 ICON "Kexec.ico"
+
+KEXEC_GUI_MAIN_DLG DIALOG DISCARDABLE 0, 0, 239, 63
+ STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION |
+   WS_SYSMENU | DS_CENTER | WS_MINIMIZEBOX | WS_VISIBLE
+ CAPTION "WinKexec GUI"
+ FONT 8, "MS Shell Dlg"
+BEGIN
+END
