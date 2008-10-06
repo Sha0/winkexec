@@ -111,8 +111,9 @@ Revision.h Revision.nsh : FORCE
 	$(PYTHON) SvnRevision.py \
 	  DRIVER=KexecDriver.c,KexecDriver.rc,KexecDriverPe.c,KexecDriver.h,KexecDriverReboot.c,KexecLinuxBoot.asm,KexecLinuxBootFlatPmodePart.asm,KexecLinuxBootRealModePart.asm,kexec.h,kexec.inf.in,Makefile,SvnRevision.py \
 	  DRIVER_NSI=DRIVER,LICENSE.txt,KexecDriver.nsi \
-	  CLIENT=DRIVER,KexecClient.c,KexecClient.rc \
-	  GUI=DRIVER,KexecGui.c,KexecGui.rc,KexecGuiManifest.xml,Kexec.ico \
+	  COMMON=DRIVER,KexecCommon.c,KexecCommon.h,KexecCommon.rc,KexecCommon.def \
+	  CLIENT=COMMON,KexecClient.c,KexecClient.rc \
+	  GUI=COMMON,KexecGui.c,KexecGui.rc,KexecGuiManifest.xml,Kexec.ico \
 	  CLIENT_NSI=CLIENT,GUI,DRIVER_NSI,EnvVarUpdate.nsh,KexecSetup.nsi
 
 FORCE :

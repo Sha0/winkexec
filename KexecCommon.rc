@@ -23,8 +23,8 @@
 LANGUAGE 9, 1
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1, 0, 0, CLIENT_REVISION
- PRODUCTVERSION 1, 0, 0, CLIENT_REVISION
+ FILEVERSION 1, 0, 0, COMMON_REVISION
+ PRODUCTVERSION 1, 0, 0, COMMON_REVISION
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
  FILEOS VOS_NT_WINDOWS32
  FILETYPE VFT_DLL
@@ -36,12 +36,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "John Stumpo"
       VALUE "FileDescription", "Kexec for Windows common functions"
-      VALUE "FileVersion", "1.0 (r" CLIENT_REVISION_STR ")"
+      VALUE "FileVersion", "1.0 (r" COMMON_REVISION_STR ")"
       VALUE "InternalName", "KexecCommon.dll"
       VALUE "LegalCopyright", L"\251 2008 John Stumpo.  GNU GPL v3 or later."
       VALUE "OriginalFilename", "KexecCommon.dll"
       VALUE "ProductName", L"WinKexec"
-      VALUE "ProductVersion", "1.0 (r" CLIENT_REVISION_STR ")"
+      VALUE "ProductVersion", "1.0 (r" COMMON_REVISION_STR ")"
     END
   END
   BLOCK "VarFileInfo"
