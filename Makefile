@@ -21,6 +21,7 @@ else
 CFLAGS = -s -O2 -W -Wall -mno-cygwin
 endif
 CYGPATH = cygpath
+DLLTOOL = dlltool
 # Use the Registry to locate the NSIS install path.
 MAKENSIS = "$(shell $(CYGPATH) "$(shell cat /proc/registry/HKEY_LOCAL_MACHINE/SOFTWARE/NSIS/@)")/makensis.exe"
 NASM = nasm
@@ -29,16 +30,18 @@ WINDRES = windres
 
 KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverReboot.o KexecDriverResources.o KexecLinuxBoot.o
 KEXEC_SYS_LIBS    = -lntoskrnl -lhal
-KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o
-KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt -ladvapi32
-KEXEC_GUI_OBJECTS = KexecGui.o KexecGuiResources.o
-KEXEC_GUI_LIBS    = -lkernel32 -lmsvcrt -ladvapi32 -luser32 -lcomctl32
+KEXEC_EXE_OBJECTS = KexecClient.o KexecClientResources.o KexecCommon.lib
+KEXEC_EXE_LIBS    = -lkernel32 -lmsvcrt
+KEXEC_GUI_OBJECTS = KexecGui.o KexecGuiResources.o KexecCommon.lib
+KEXEC_GUI_LIBS    = -lkernel32 -lmsvcrt -luser32 -lcomctl32
+KEXECCOMMON_DLL_OBJECTS = KexecCommon.o KexecCommonResources.o
+KEXECCOMMON_DLL_LIBS = -lkernel32 -lmsvcrt -ladvapi32 -luser32
 
 all : KexecSetup.exe
 .PHONY : all
 
 clean :
-	-rm -f *.sys *.o *.exe *.inf *.bin Revision.h Revision.nsh
+	-rm -f *.sys *.o *.exe *.inf *.bin *.dll *.lib Revision.h Revision.nsh
 .PHONY : clean
 
 KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
@@ -74,7 +77,7 @@ KexecLinuxBootRealModePart.bin : KexecLinuxBootRealModePart.asm
 kexec.exe : $(KEXEC_EXE_OBJECTS)
 	$(CC) $(CFLAGS) -o kexec.exe $(KEXEC_EXE_OBJECTS) $(KEXEC_EXE_LIBS)
 
-KexecClient.o : KexecClient.c kexec.h Revision.h
+KexecClient.o : KexecClient.c kexec.h Revision.h KexecCommon.h
 	$(CC) $(CFLAGS) -c -o KexecClient.o KexecClient.c
 
 KexecClientResources.o : KexecClient.rc Revision.h
@@ -83,11 +86,23 @@ KexecClientResources.o : KexecClient.rc Revision.h
 KexecGui.exe : $(KEXEC_GUI_OBJECTS)
 	$(CC) -mwindows $(CFLAGS) -o KexecGui.exe $(KEXEC_GUI_OBJECTS) $(KEXEC_GUI_LIBS)
 
-KexecGui.o : KexecGui.c kexec.h Revision.h
+KexecGui.o : KexecGui.c kexec.h Revision.h KexecCommon.h
 	$(CC) $(CFLAGS) -c -o KexecGui.o KexecGui.c
 
 KexecGuiResources.o : KexecGui.rc Revision.h KexecGuiManifest.xml Kexec.ico
 	$(WINDRES) -o KexecGuiResources.o KexecGui.rc
+
+KexecCommon.o : KexecCommon.c KexecCommon.h
+	$(CC) $(CFLAGS) -c -o KexecCommon.o KexecCommon.c
+
+KexecCommonResources.o : KexecCommon.rc Revision.h
+	$(WINDRES) -o KexecCommonResources.o KexecCommon.rc
+
+KexecCommon.dll : $(KEXECCOMMON_DLL_OBJECTS)
+	$(CC) $(CFLAGS) -shared -o KexecCommon.dll $(KEXECCOMMON_DLL_OBJECTS) $(KEXECCOMMON_DLL_LIBS)
+
+KexecCommon.lib : KexecCommon.dll KexecCommon.def
+	$(DLLTOOL) -l KexecCommon.lib -D KexecCommon.dll -d KexecCommon.def
 
 kexec.inf : kexec.inf.in
 	$(MAKE) Revision.h

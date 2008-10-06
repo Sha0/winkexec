@@ -18,18 +18,16 @@
 #include <winuser.h>
 #include <winver.h>
 
-#include "KexecGuiResources.h"
-
 #include "Revision.h"
 
 LANGUAGE 9, 1
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1, 0, 0, GUI_REVISION
- PRODUCTVERSION 1, 0, 0, GUI_REVISION
+ FILEVERSION 1, 0, 0, CLIENT_REVISION
+ PRODUCTVERSION 1, 0, 0, CLIENT_REVISION
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
  FILEOS VOS_NT_WINDOWS32
- FILETYPE VFT_APP
+ FILETYPE VFT_DLL
  FILESUBTYPE VFT2_UNKNOWN
 BEGIN
   BLOCK "StringFileInfo"
@@ -37,30 +35,17 @@ BEGIN
     BLOCK "040904B0"
     BEGIN
       VALUE "CompanyName", "John Stumpo"
-      VALUE "FileDescription", "Kexec for Windows GUI"
-      VALUE "FileVersion", "1.0 (r" GUI_REVISION_STR ")"
-      VALUE "InternalName", "KexecGui.exe"
+      VALUE "FileDescription", "Kexec for Windows common functions"
+      VALUE "FileVersion", "1.0 (r" CLIENT_REVISION_STR ")"
+      VALUE "InternalName", "KexecCommon.dll"
       VALUE "LegalCopyright", L"\251 2008 John Stumpo.  GNU GPL v3 or later."
-      VALUE "OriginalFilename", "KexecGui.exe"
+      VALUE "OriginalFilename", "KexecCommon.dll"
       VALUE "ProductName", L"WinKexec"
-      VALUE "ProductVersion", "1.0 (r" GUI_REVISION_STR ")"
+      VALUE "ProductVersion", "1.0 (r" CLIENT_REVISION_STR ")"
     END
   END
   BLOCK "VarFileInfo"
   BEGIN
     VALUE "Translation", 0x409, 1200
   END
-END
-
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "KexecGuiManifest.xml"
-
-KEXEC_GUI_ICON ICON "Kexec.ico"
-
-KEXEC_GUI_MAIN_DLG DIALOGEX 0, 0, 239, 63
- STYLE WS_OVERLAPPED | WS_POPUP | WS_CAPTION | DS_FIXEDSYS |
-   WS_SYSMENU | DS_CENTER | WS_MINIMIZEBOX | WS_VISIBLE
- CAPTION "WinKexec GUI"
- FONT 8, "MS Shell Dlg", 0, 0, 1
-BEGIN
- DEFPUSHBUTTON "OK", IDOK, 130, 10, 50, 14
 END

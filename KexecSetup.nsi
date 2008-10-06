@@ -98,6 +98,7 @@ NoKexecUninstall:
   # (Either it wasn't there, or we nuked it ourselves.)
 DoneKexecUninstall:
   SetOutPath $INSTDIR
+  File KexecCommon.dll
   File kexec.exe
   File KexecGui.exe
   File KexecDriver.exe
@@ -137,6 +138,7 @@ DoneDriverUninstall:
   ${un.EnvVarUpdate} $0 PATH R HKLM $INSTDIR
   Delete $INSTDIR\kexec.exe
   Delete $INSTDIR\KexecGui.exe
+  Delete $INSTDIR\KexecCommon.dll
   Delete $INSTDIR\KexecDriver.exe
   # Our InstallDirRegKey is no longer useful.
   DeleteRegValue HKLM "Software\WinKexec" InstallRoot

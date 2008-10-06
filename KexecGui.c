@@ -20,65 +20,13 @@
 #include <commctrl.h>
 
 #include "KexecGuiResources.h"
+#include "KexecCommon.h"
 
 HINSTANCE hInst;
 
-/* Convenient wrapper around FormatMessage() and GetLastError() */
-LPSTR KexecTranslateError(void)
-{
-  static LPSTR msgbuf = NULL;
-
-  if (msgbuf) {
-    LocalFree(msgbuf);
-    msgbuf = NULL;
-  }
-
-  FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-    NULL, GetLastError(), LANG_USER_DEFAULT, (LPSTR)&msgbuf, 0, NULL);
-
-  return msgbuf;
-}
-
-/* MessageBox with printf. */
-void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
-  LPCSTR title, DWORD flags, ...)
-{
-  char buf[256];
-  va_list args;
-  void WINAPI (*my_vsnprintf)(LPSTR, size_t, LPCSTR, va_list);
-  HMODULE msvcrt;
-
-  va_start(args, flags);
-
-  /* We can't KexecPerror() these errors or we could infinitely recurse... */
-  if (!(msvcrt = GetModuleHandle("msvcrt"))) {
-    MessageBox(NULL, KexecTranslateError(), "Opening msvcrt.dll",
-      MB_ICONERROR | MB_OK);
-    exit(EXIT_FAILURE);
-  }
-  if (!(my_vsnprintf = GetProcAddress(msvcrt, "_vsnprintf"))) {
-    MessageBox(NULL, KexecTranslateError(), "Locating _vsnprintf",
-      MB_ICONERROR | MB_OK);
-    exit(EXIT_FAILURE);
-  }
-  my_vsnprintf(buf, 255, fmtstr, args);
-  buf[255] = '\0';
-  MessageBox(parent, buf, title, flags);
-  va_end(args);
-}
-
-/* Even more convenient wrapper around KexecTranslateError().
-   Use just like perror().
-   This uses an error MessageBox instead of printing to stderr.
-   XXX: Does the Windows API have something like this already? */
-void KexecPerror(char * errmsg)
-{
-  MessageBoxPrintf(NULL, "%s: %s", "WinKexec GUI", MB_ICONERROR | MB_OK,
-    errmsg, KexecTranslateError());
-}
-
 void KexecThisProgramIsAStump(void)
 {
+  /* Kyle is awesome. */
   MessageBox(NULL, "This program is a stump.  You can help by expanding it.",
     "WinKexec GUI", MB_ICONERROR | MB_OK);
 }
@@ -87,9 +35,22 @@ void KexecThisProgramIsAStump(void)
 BOOL CALLBACK KexecGuiMainDlgProc(HWND hDlg, UINT msg,
   WPARAM wParam, LPARAM lParam)
 {
+  HANDLE bigIcon, smallIcon;
+
   switch (msg) {
     case WM_INITDIALOG:
       KexecThisProgramIsAStump();
+
+      bigIcon = LoadImage(hInst, MAKEINTRESOURCE(KEXEC_GUI_ICON),
+        IMAGE_ICON, GetSystemMetrics(SM_CXICON),
+        GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR);
+      SendMessage(hDlg, WM_SETICON, ICON_BIG, (LPARAM)bigIcon);
+
+      smallIcon = LoadImage(hInst, MAKEINTRESOURCE(KEXEC_GUI_ICON),
+        IMAGE_ICON, GetSystemMetrics(SM_CXSMICON),
+        GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR);
+      SendMessage(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)smallIcon);
+
       break;
     case WM_DESTROY:
       PostQuitMessage(0);
@@ -111,6 +72,9 @@ int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev,
   HWND hDlg;
   MSG msg;
   DWORD status;
+
+  /* Tell KexecCommon.dll that we're GUI. */
+  KexecCommonInit(TRUE);
 
   /* Go XP style. */
   initComCtlEx.dwSize = sizeof(INITCOMMONCONTROLSEX);

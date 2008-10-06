@@ -15,10 +15,19 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KEXEC_GUI_RESOURCES_H
-#define KEXEC_GUI_RESOURCES_H
+#ifndef KEXECCOMMON_H
+#define KEXECCOMMON_H
 
-#define KEXEC_GUI_ICON 1
-#define KEXEC_GUI_MAIN_DLG 1
+#include <windows.h>
+#include <stdio.h>
+
+LPSTR KexecTranslateError(void);
+void KexecPerror(char * errmsg);
+void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
+  LPCSTR title, DWORD flags, ...);
+BOOL KexecDriverIsLoaded(void);
+void LoadKexecDriver(void);
+void UnloadKexecDriver(void);
+void KexecCommonInit(BOOL in_isGui);
 
 #endif

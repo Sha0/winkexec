@@ -20,149 +20,7 @@
 #include "kexec.h"
 #include "Revision.h"
 
-/* Convenient wrapper around FormatMessage() and GetLastError() */
-LPSTR KexecTranslateError(void)
-{
-  static LPSTR msgbuf = NULL;
-
-  if (msgbuf) {
-    LocalFree(msgbuf);
-    msgbuf = NULL;
-  }
-
-  FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_ALLOCATE_BUFFER,
-    NULL, GetLastError(), LANG_USER_DEFAULT, (LPSTR)&msgbuf, 0, NULL);
-
-  return msgbuf;
-}
-
-/* Even more convenient wrapper around the above function.
-   Use just like perror().
-   XXX: Does the Windows API have something like this already? */
-void KexecPerror(char * errmsg)
-{
-  fprintf(stderr, "%s: %s", errmsg, KexecTranslateError());
-}
-
-/* Is the kexec driver loaded? */
-BOOL KexecDriverIsLoaded(void)
-{
-  SC_HANDLE Scm;
-  SC_HANDLE KexecService;
-  SERVICE_STATUS_PROCESS ServiceStatus;
-  BOOL retval;
-  DWORD ExtraBytes;
-
-  Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-  if (!Scm) {
-    KexecPerror("Could not open SCM");
-    exit(EXIT_FAILURE);
-  }
-
-  KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
-  if (!KexecService) {
-    KexecPerror("Could not open the kexec service");
-    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
-    CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
-  }
-
-  if (!QueryServiceStatusEx(KexecService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ServiceStatus,
-    sizeof(ServiceStatus), &ExtraBytes))
-  {
-    KexecPerror("Could not query the kexec service");
-    fprintf(stderr, "(Are you an admin?)\n");
-    CloseServiceHandle(KexecService);
-    CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
-  }
-
-  retval = (ServiceStatus.dwCurrentState == SERVICE_RUNNING);
-  CloseServiceHandle(KexecService);
-  CloseServiceHandle(Scm);
-  return retval;
-}
-
-/* Load kexec.sys into the kernel, if it isn't already. */
-void LoadKexecDriver(void)
-{
-  SC_HANDLE Scm;
-  SC_HANDLE KexecService;
-
-  if (KexecDriverIsLoaded())
-    return;
-
-  printf("Loading the kexec driver... ");
-
-  Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-  if (!Scm) {
-    KexecPerror("Could not open SCM");
-    exit(EXIT_FAILURE);
-  }
-
-  KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
-  if (!KexecService) {
-    KexecPerror("Could not open the kexec service");
-    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
-    CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
-  }
-
-  /* This does not return until DriverEntry() has completed in kexec.sys. */
-  if (!StartService(KexecService, 0, NULL)) {
-    KexecPerror("Could not start the kexec service");
-    fprintf(stderr, "(Are you an admin?)\n");
-    CloseServiceHandle(KexecService);
-    CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
-  }
-
-  CloseServiceHandle(KexecService);
-  CloseServiceHandle(Scm);
-  printf("ok\n");
-  return;
-}
-
-/* If kexec.sys is loaded into the kernel, unload it. */
-void UnloadKexecDriver(void)
-{
-  SC_HANDLE Scm;
-  SC_HANDLE KexecService;
-  SERVICE_STATUS ServiceStatus;
-
-  if (!KexecDriverIsLoaded())
-    return;
-
-  printf("Unloading the kexec driver... ");
-
-  Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
-  if (!Scm) {
-    KexecPerror("Could not open SCM");
-    exit(EXIT_FAILURE);
-  }
-
-  KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
-  if (!KexecService) {
-    KexecPerror("Could not open the kexec service");
-    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
-    CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
-  }
-
-  /* This does not return until DriverUnload() has completed in kexec.sys. */
-  if (!ControlService(KexecService, SERVICE_CONTROL_STOP, &ServiceStatus)) {
-    KexecPerror("Could not stop the kexec service");
-    fprintf(stderr, "(Are you an admin?)\n");
-    CloseServiceHandle(KexecService);
-    CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
-  }
-
-  CloseServiceHandle(KexecService);
-  CloseServiceHandle(Scm);
-  printf("ok\n");
-  return;
-}
+#include "KexecCommon.h"
 
 /* Handle kexec /l */
 int DoLoad(int argc, char** argv)
@@ -417,6 +275,9 @@ int main(int argc, char** argv)
   /* No args given, no sense in doing anything. */
   if (argc < 2)
     usage();
+
+  /* Tell KexecCommon.dll that we're not GUI. */
+  KexecCommonInit(FALSE);
 
   /* Allow Unix-style cmdline options.
      XXX: Add GNU-style too! */
