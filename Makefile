@@ -50,6 +50,7 @@ KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpd
 KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
 	$(MAKENSIS) KexecDriver.nsi
 
+# Using -shared exports every symbol, but otherwise it would be impossible to debug it efficiently with WinDbg...
 kexec.sys : $(KEXEC_SYS_OBJECTS)
 	$(CC) $(CFLAGS) -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys $(KEXEC_SYS_OBJECTS) $(KEXEC_SYS_LIBS)
 
@@ -98,8 +99,9 @@ KexecCommon.o : KexecCommon.c KexecCommon.h
 KexecCommonResources.o : KexecCommon.rc Revision.h
 	$(WINDRES) -o KexecCommonResources.o KexecCommon.rc
 
+# We use -mdll so then only DLLEXPORTed stuff is exported.
 KexecCommon.dll : $(KEXECCOMMON_DLL_OBJECTS)
-	$(CC) $(CFLAGS) -shared -o KexecCommon.dll $(KEXECCOMMON_DLL_OBJECTS) $(KEXECCOMMON_DLL_LIBS)
+	$(CC) $(CFLAGS) -mdll -o KexecCommon.dll $(KEXECCOMMON_DLL_OBJECTS) $(KEXECCOMMON_DLL_LIBS)
 
 KexecCommon.lib : KexecCommon.dll KexecCommon.def
 	$(DLLTOOL) -l KexecCommon.lib -D KexecCommon.dll -d KexecCommon.def

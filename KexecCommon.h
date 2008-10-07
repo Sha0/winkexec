@@ -21,13 +21,22 @@
 #include <windows.h>
 #include <stdio.h>
 
-LPSTR KexecTranslateError(void);
-void KexecPerror(char * errmsg);
-void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
+#ifdef DLLIMPORT
+#undef DLLIMPORT
+#endif
+#define DLLIMPORT __attribute__((__dllimport__))
+#ifdef DLLEXPORT
+#undef DLLEXPORT
+#endif
+#define DLLEXPORT __attribute__((__dllexport__))
+
+DLLIMPORT LPSTR KexecTranslateError(void);
+DLLIMPORT void KexecPerror(char * errmsg);
+DLLIMPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
   LPCSTR title, DWORD flags, ...);
-BOOL KexecDriverIsLoaded(void);
-void LoadKexecDriver(void);
-void UnloadKexecDriver(void);
-void KexecCommonInit(BOOL in_isGui);
+DLLIMPORT BOOL KexecDriverIsLoaded(void);
+DLLIMPORT void LoadKexecDriver(void);
+DLLIMPORT void UnloadKexecDriver(void);
+DLLIMPORT void KexecCommonInit(BOOL in_isGui);
 
 #endif
