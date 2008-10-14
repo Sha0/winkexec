@@ -21,7 +21,7 @@
 BOOL isGui;
 
 /* Convenient wrapper around FormatMessage() and GetLastError() */
-DLLEXPORT LPSTR KexecTranslateError(void)
+KEXEC_DLLEXPORT LPSTR KexecTranslateError(void)
 {
   static LPSTR msgbuf = NULL;
 
@@ -39,7 +39,7 @@ DLLEXPORT LPSTR KexecTranslateError(void)
 /* Even more convenient wrapper around the above function.
    Use just like perror().
    XXX: Does the Windows API have something like this already? */
-DLLEXPORT void KexecPerror(char * errmsg)
+KEXEC_DLLEXPORT void KexecPerror(char * errmsg)
 {
   if (isGui)
     MessageBoxPrintf(NULL, "%s: %s", "WinKexec GUI", MB_ICONERROR | MB_OK,
@@ -49,7 +49,7 @@ DLLEXPORT void KexecPerror(char * errmsg)
 }
 
 /* MessageBox with printf. */
-DLLEXPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
+KEXEC_DLLEXPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
   LPCSTR title, DWORD flags, ...)
 {
   char buf[256];
@@ -77,7 +77,7 @@ DLLEXPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
 }
 
 /* Is the kexec driver loaded? */
-DLLEXPORT BOOL KexecDriverIsLoaded(void)
+KEXEC_DLLEXPORT BOOL KexecDriverIsLoaded(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
@@ -116,7 +116,7 @@ DLLEXPORT BOOL KexecDriverIsLoaded(void)
 }
 
 /* Load kexec.sys into the kernel, if it isn't already. */
-DLLEXPORT void LoadKexecDriver(void)
+KEXEC_DLLEXPORT void LoadKexecDriver(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
@@ -156,7 +156,7 @@ DLLEXPORT void LoadKexecDriver(void)
 }
 
 /* If kexec.sys is loaded into the kernel, unload it. */
-DLLEXPORT void UnloadKexecDriver(void)
+KEXEC_DLLEXPORT void UnloadKexecDriver(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
@@ -197,7 +197,7 @@ DLLEXPORT void UnloadKexecDriver(void)
 }
 
 /* What we must know before continuing... */
-DLLEXPORT void KexecCommonInit(BOOL in_isGui)
+KEXEC_DLLEXPORT void KexecCommonInit(BOOL in_isGui)
 {
   isGui = in_isGui;
 }

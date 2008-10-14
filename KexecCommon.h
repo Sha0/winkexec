@@ -21,22 +21,30 @@
 #include <windows.h>
 #include <stdio.h>
 
-#ifdef DLLIMPORT
-#undef DLLIMPORT
+#ifdef KEXEC_DLLIMPORT
+# undef KEXEC_DLLIMPORT
 #endif
-#define DLLIMPORT __attribute__((__dllimport__))
-#ifdef DLLEXPORT
-#undef DLLEXPORT
+#ifdef __GNUC__
+# define KEXEC_DLLIMPORT __attribute__((__dllimport__))
+#else
+# define KEXEC_DLLIMPORT __declspec(dllimport)
 #endif
-#define DLLEXPORT __attribute__((__dllexport__))
+#ifdef KEXEC_DLLEXPORT
+# undef KEXEC_DLLEXPORT
+#endif
+#ifdef __GNUC__
+# define KEXEC_DLLEXPORT __attribute__((__dllexport__))
+#else
+# define KEXEC_DLLEXPORT __declspec(dllexport)
+#endif
 
-DLLIMPORT LPSTR KexecTranslateError(void);
-DLLIMPORT void KexecPerror(char * errmsg);
-DLLIMPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
+KEXEC_DLLIMPORT LPSTR KexecTranslateError(void);
+KEXEC_DLLIMPORT void KexecPerror(char * errmsg);
+KEXEC_DLLIMPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
   LPCSTR title, DWORD flags, ...);
-DLLIMPORT BOOL KexecDriverIsLoaded(void);
-DLLIMPORT void LoadKexecDriver(void);
-DLLIMPORT void UnloadKexecDriver(void);
-DLLIMPORT void KexecCommonInit(BOOL in_isGui);
+KEXEC_DLLIMPORT BOOL KexecDriverIsLoaded(void);
+KEXEC_DLLIMPORT void LoadKexecDriver(void);
+KEXEC_DLLIMPORT void UnloadKexecDriver(void);
+KEXEC_DLLIMPORT void KexecCommonInit(BOOL in_isGui);
 
 #endif

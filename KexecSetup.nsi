@@ -37,6 +37,7 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
+!insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
@@ -80,6 +81,7 @@ Function un.onInit
 FunctionEnd
 
 Section "Kexec"
+  SectionIn RO
   # First, check if WinKexec is already installed, and, if so,
   # figure out how to uninstall it.
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "UninstallString"
@@ -117,6 +119,13 @@ DoneKexecUninstall:
   ${EnvVarUpdate} $0 PATH A HKLM $INSTDIR
 SectionEnd
 
+Section /o "Developer Components"
+  SetOutPath $INSTDIR\devel
+  File kexec.h
+  File KexecCommon.h
+  File KexecCommon.lib
+SectionEnd
+
 Section "Uninstall"
   # Unload the driver.
   ExecWait "$\"$INSTDIR\kexec.exe$\" /u"
@@ -136,6 +145,10 @@ NoDriverUninstall:
 DoneDriverUninstall:
   # Remove us from the PATH.
   ${un.EnvVarUpdate} $0 PATH R HKLM $INSTDIR
+  Delete $INSTDIR\devel\kexec.h
+  Delete $INSTDIR\devel\KexecCommon.h
+  Delete $INSTDIR\devel\KexecCommon.lib
+  RmDir $INSTDIR\devel
   Delete $INSTDIR\kexec.exe
   Delete $INSTDIR\KexecGui.exe
   Delete $INSTDIR\KexecCommon.dll
