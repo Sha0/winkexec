@@ -14,19 +14,23 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-CC = gcc
+CC = $(CROSS)gcc
 ifdef DEBUG
 CFLAGS = -g3 -O2 -W -Wall -mno-cygwin
 else
 CFLAGS = -s -O2 -W -Wall -mno-cygwin
 endif
 CYGPATH = cygpath
-DLLTOOL = dlltool
+DLLTOOL = $(CROSS)dlltool
+ifeq ($(CROSS),)
 # Use the Registry to locate the NSIS install path.
 MAKENSIS = "$(shell $(CYGPATH) "$(shell cat /proc/registry/HKEY_LOCAL_MACHINE/SOFTWARE/NSIS/@)")/makensis.exe"
+else
+MAKENSIS = makensis
+endif
 NASM = nasm
 PYTHON = python
-WINDRES = windres
+WINDRES = $(CROSS)windres
 
 KEXEC_SYS_OBJECTS = KexecDriver.o KexecDriverPe.o KexecDriverReboot.o KexecDriverResources.o KexecLinuxBoot.o
 KEXEC_SYS_LIBS    = -lntoskrnl -lhal
