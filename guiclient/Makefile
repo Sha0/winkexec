@@ -14,26 +14,18 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-include common.mk
+include ../common.mk
 
-SUBDIRS = revtag driver clientdll cliclient guiclient setup
+CFLAGS += -I../include
 
-all :
-	set -e; \
-for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir ; \
-done
-.PHONY : all
+KEXEC_GUI_OBJECTS = KexecGui.o resource.o
+KEXEC_GUI_LIBS    = ../clientdll/KexecCommon.lib -lkernel32 -lmsvcrt -luser32 -lcomctl32
+
+__main_target : KexecGui.exe
+
+KexecGui.exe : $(KEXEC_GUI_OBJECTS)
+	$(CC) -mwindows $(CFLAGS) -o KexecGui.exe $(KEXEC_GUI_OBJECTS) $(KEXEC_GUI_LIBS)
 
 clean :
-	for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir clean ; \
-done
+	-rm -f KexecGui.exe *.o
 .PHONY : clean
-
-
-KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
-	$(MAKENSIS) KexecSetup.nsi
-
-KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
-	$(MAKENSIS) KexecDriver.nsi

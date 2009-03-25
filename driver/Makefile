@@ -14,26 +14,24 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-include common.mk
+include ../common.mk
 
-SUBDIRS = revtag driver clientdll cliclient guiclient setup
+CFLAGS += -I../include
 
-all :
-	set -e; \
-for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir ; \
-done
-.PHONY : all
+KEXEC_SYS_OBJECTS = buffer.o entry.o io.o libpe.o reboot.o resource.o linuxboot.o
+KEXEC_SYS_LIBS = -lntoskrnl -lhal
+
+__main_target : kexec.sys kexec.inf
+
+# Using -shared exports every symbol, but otherwise it would be impossible to debug it efficiently with WinDbg...
+kexec.sys : $(KEXEC_SYS_OBJECTS)
+	$(CC) $(CFLAGS) -shared -nostdlib -Wl,--entry,_DriverEntry@8 -o kexec.sys $(KEXEC_SYS_OBJECTS) $(KEXEC_SYS_LIBS)
+
+kexec.inf : kexec.inf.in
+	$(PYTHON) ../revtag/revtag.py --tag-file .. kexec.inf.in >kexec.inf
 
 clean :
-	for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir clean ; \
-done
+	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin
 .PHONY : clean
 
-
-KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
-	$(MAKENSIS) KexecSetup.nsi
-
-KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
-	$(MAKENSIS) KexecDriver.nsi
+linuxboot.o : linuxboot_blobs/flatpmode.bin linuxboot_blobs/realmode.bin

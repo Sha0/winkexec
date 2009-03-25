@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -19,8 +19,9 @@
 #include <windows.h>
 #include <commctrl.h>
 
-#include "KexecGuiResources.h"
-#include "KexecCommon.h"
+#include <KexecCommon.h>
+
+#include "resource.h"
 
 HINSTANCE hInst;
 
@@ -65,8 +66,8 @@ BOOL CALLBACK KexecGuiMainDlgProc(HWND hDlg, UINT msg,
 }
 
 /* The entry point. */
-int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev,
-  LPSTR cmdline, int winstyle)
+int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev KEXEC_UNUSED,
+  LPSTR cmdline KEXEC_UNUSED, int winstyle KEXEC_UNUSED)
 {
   INITCOMMONCONTROLSEX initComCtlEx;
   HWND hDlg;

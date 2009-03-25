@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -21,30 +21,21 @@
 #include <windows.h>
 #include <stdio.h>
 
-#ifdef KEXEC_DLLIMPORT
-# undef KEXEC_DLLIMPORT
-#endif
-#ifdef __GNUC__
-# define KEXEC_DLLIMPORT __attribute__((__dllimport__))
+#include <kexec.h>
+
+#ifdef IN_KEXEC_COMMON
+# define KEXECCOMMON_SPEC KEXEC_DLLEXPORT
 #else
-# define KEXEC_DLLIMPORT __declspec(dllimport)
-#endif
-#ifdef KEXEC_DLLEXPORT
-# undef KEXEC_DLLEXPORT
-#endif
-#ifdef __GNUC__
-# define KEXEC_DLLEXPORT __attribute__((__dllexport__))
-#else
-# define KEXEC_DLLEXPORT __declspec(dllexport)
+# define KEXECCOMMON_SPEC KEXEC_DLLIMPORT
 #endif
 
-KEXEC_DLLIMPORT LPSTR KexecTranslateError(void);
-KEXEC_DLLIMPORT void KexecPerror(char * errmsg);
-KEXEC_DLLIMPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
+KEXECCOMMON_SPEC LPSTR KexecTranslateError(void);
+KEXECCOMMON_SPEC void KexecPerror(char * errmsg);
+KEXECCOMMON_SPEC void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
   LPCSTR title, DWORD flags, ...);
-KEXEC_DLLIMPORT BOOL KexecDriverIsLoaded(void);
-KEXEC_DLLIMPORT void LoadKexecDriver(void);
-KEXEC_DLLIMPORT void UnloadKexecDriver(void);
-KEXEC_DLLIMPORT void KexecCommonInit(BOOL in_isGui);
+KEXECCOMMON_SPEC BOOL KexecDriverIsLoaded(void);
+KEXECCOMMON_SPEC void LoadKexecDriver(void);
+KEXECCOMMON_SPEC void UnloadKexecDriver(void);
+KEXECCOMMON_SPEC void KexecCommonInit(BOOL in_isGui);
 
 #endif

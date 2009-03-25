@@ -14,26 +14,36 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-include common.mk
+CC = $(CROSS)gcc
+ifdef DEBUG
+CFLAGS = -g3 -O2 -W -Wall -mno-cygwin
+else
+CFLAGS = -s -O2 -W -Wall -mno-cygwin
+endif
+CYGPATH = cygpath
+DLLTOOL = $(CROSS)dlltool
+ifeq ($(CROSS),)
+# Use the Registry to locate the NSIS install path.
+MAKENSIS = "$(shell $(CYGPATH) "$(shell cat /proc/registry/HKEY_LOCAL_MACHINE/SOFTWARE/NSIS/@)")/makensis.exe"
+else
+MAKENSIS = makensis
+endif
+NASM = nasm
+PYTHON = python
+WINDRES = $(CROSS)windres
 
-SUBDIRS = revtag driver clientdll cliclient guiclient setup
-
-all :
-	set -e; \
-for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir ; \
-done
+all : __main_target
 .PHONY : all
+.PHONY : __main_target
 
-clean :
-	for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir clean ; \
-done
-.PHONY : clean
+.rc.o :
+	$(WINDRES) $(RCFLAGS) -o $@ $<
 
+.asm.o :
+	$(NASM) $(NASMFLAGS) -f coff -o $@ $<
 
-KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
-	$(MAKENSIS) KexecSetup.nsi
+.asm.bin :
+	$(NASM) $(NASMFLAGS) -f bin -o $@ $<
 
-KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
-	$(MAKENSIS) KexecDriver.nsi
+.SUFFIXES :
+.SUFFIXES : .c .o .rc .asm .bin

@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,12 @@
 
 #include <windows.h>
 #include <stdio.h>
-#include "kexec.h"
-#include "Revision.h"
 
-#include "KexecCommon.h"
+#include <KexecCommon.h>
+#include <kexec.h>
+
+#include "../revtag/revtag.h"
+
 
 /* Handle kexec /l */
 int DoLoad(int argc, char** argv)
@@ -133,7 +135,7 @@ int DoLoad(int argc, char** argv)
       /* Make sure we got all of it. */
       if (ilen != read_len) {
         fprintf(stderr, "internal error: buffer length mismatch!\n");
-        fprintf(stderr, "(" __FILE__ ":%d in revision %d)\n", __LINE__, CLIENT_REVISION);
+        fprintf(stderr, "(" __FILE__ ":%d in revision %d)\n", __LINE__, SVN_REVISION);
         fprintf(stderr, "please report this to Stump!\n");
         exit(EXIT_FAILURE);
       }
@@ -211,7 +213,7 @@ int DoLoad(int argc, char** argv)
 }
 
 /* Handle kexec /u */
-int DoUnload(int argc, char** argv)
+int DoUnload(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
 {
   if (KexecDriverIsLoaded())
     UnloadKexecDriver();
@@ -221,7 +223,7 @@ int DoUnload(int argc, char** argv)
 }
 
 /* Handle kexec /s */
-int DoShow(int argc, char** argv)
+int DoShow(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
 {
   /* kexec.sys can't tell us anything if it's not loaded... */
   if (!KexecDriverIsLoaded()) {
@@ -241,8 +243,8 @@ void usage()
 {
   fprintf(stderr, "%s",
 "\n\
-WinKexec: kexec for Windows (v1.0, svn revision " CLIENT_REVISION_STR ")\n\
-Copyright (C) 2008 John Stumpo\n\
+WinKexec: kexec for Windows (v1.0, svn revision " SVN_REVISION_STR ")\n\
+Copyright (C) 2008-2009 John Stumpo\n\
 \n\
 This program is free software; you may redistribute or modify it under the\n\
 terms of the GNU General Public License, version 3 or later.  There is\n\

@@ -1,5 +1,5 @@
 ; WinKexec: kexec for Windows
-; Copyright (C) 2008 John Stumpo
+; Copyright (C) 2008-2009 John Stumpo
 ;
 ; This program is free software: you can redistribute it and/or modify
 ; it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ extern _KexecKernelCommandLine
 
 ; Amazingly, we only use these five things from ntoskrnl.exe
 extern __imp__KeBugCheckEx@20
-extern __imp__MmAllocateContiguousMemory@8
+extern __imp__MmAllocateContiguousMemory@12
 extern __imp__MmGetPhysicalAddress@4
 extern __imp__MmMapIoSpace@16  ; to be sorely abused below
 extern __imp__MmUnmapIoSpace@8
@@ -75,7 +75,7 @@ _KexecLinuxBoot:
   push dword 0  ; High 32 bits of maximum allowable physical address
   push dword 0x00097fff  ; Low 32 bits
   push ecx  ; Number of bytes to allocate.
-  call dword [__imp__MmAllocateContiguousMemory@8]  ; Mapping into eax.
+  call dword [__imp__MmAllocateContiguousMemory@12]  ; Mapping into eax.
   mov edx,1
   test eax,eax
   jz near .bsod  ; possible kexec BSoD #1: allocating kernel map failed
@@ -147,7 +147,7 @@ _KexecLinuxBoot:
   push dword 0  ; High 32 bits of maximum allowable physical address
   push dword 0x00097fff  ; Low 32 bits
   push edi  ; Number of bytes to allocate.
-  call dword [__imp__MmAllocateContiguousMemory@8]  ; Mapping into eax.
+  call dword [__imp__MmAllocateContiguousMemory@12]  ; Mapping into eax.
   mov edx,5
   test eax,eax
   jz near .bsod  ; possible kexec BSoD #5: allocating real mode code failed
@@ -338,7 +338,7 @@ bits 32
 
 _KexecLinuxBootFlatProtectedModeCode:
 
-incbin "KexecLinuxBootFlatPmodePart.bin"
+incbin "linuxboot_blobs/flatpmode.bin"
 
 ; Still more code! (16-bit this time.) Call it data since that's what it
 ; is, as far as the 32-bit code is concerned...
@@ -348,7 +348,7 @@ bits 16
 ; Put us into the read-only data section of kexec.sys.  kexec.sys will
 ; copy us to real-mode memory and run us via the above routine.
 _KexecLinuxBootRealModeCodeStart:
-incbin "KexecLinuxBootRealModePart.bin"
+incbin "linuxboot_blobs/realmode.bin"
 _KexecLinuxBootRealModeCodeEnd:
 
 ; We'll put our shiny new GDT and IDT in .rdata since they're, well, data.

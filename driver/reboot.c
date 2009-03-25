@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -17,10 +17,11 @@
 
 /* Hook system reboot, and define the stuff needed to handle it. */
 
-#include <ddk/ntddk.h>
-#include "KexecDriver.h"
+#include "libpe.h"
+#include "linuxboot.h"
+#include "reboot.h"
 
-void KexecDoReboot(void)
+static void KexecDoReboot(void)
 {
   KexecLinuxBoot();
   /* Linux boot failed... the only sensible thing is a BSoD (if we can...)

@@ -1,5 +1,7 @@
-/* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+/* libpe: Small library to do interesting things with PE
+ *   executables from kernel mode under Windows.
+ * Originally developed as part of WinKexec: kexec for Windows
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,25 +15,16 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * This file is available under a proprietary license as well.
+ * Contact John Stumpo <stump@jstump.com> for details.
  */
 
-#ifndef KEXEC_DRIVER_H
-#define KEXEC_DRIVER_H
+#ifndef __LIBPE_H
+#define __LIBPE_H
 
 #include <ddk/ntddk.h>
 
-/* From KexecDriver.c */
-typedef struct {
-  ULONG Size;
-  PVOID Data;
-  FAST_MUTEX Mutex;
-} KEXEC_BUFFER, *PKEXEC_BUFFER;
-
-extern KEXEC_BUFFER KexecKernel;
-extern KEXEC_BUFFER KexecInitrd;
-extern KEXEC_BUFFER KexecKernelCommandLine;
-
-/* From KexecDriverPe.c */
 PVOID PeReadSystemFile(PWCHAR Filename);
 PIMAGE_NT_HEADERS PeGetNtHeaders(PVOID PeFile);
 PIMAGE_SECTION_HEADER PeGetFirstSectionHeader(PVOID PeFile);
@@ -48,16 +41,5 @@ DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName);
     (SectionVariable) - PeGetFirstSectionHeader(PeFile) < \
       PeGetSectionCount(PeFile); \
     (SectionVariable)++)
-
-/* From KexecDriverReboot.c */
-NTSTATUS KexecHookReboot(void);
-
-/* From KexecLinuxBoot.asm */
-void KexecLinuxBoot(void);
-extern struct {} KexecLinuxBootRealModeCodeStart;
-extern struct {} KexecLinuxBootRealModeCodeEnd;
-#define KexecLinuxBootRealModeCode KexecLinuxBootRealModeCodeStart
-#define KexecLinuxBootRealModeCodeSize \
-  (KexecLinuxBootRealModeCodeEnd - KexecLinuxBootRealModeCodeStart)
 
 #endif

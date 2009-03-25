@@ -1,5 +1,5 @@
 # WinKexec: kexec for Windows
-# Copyright (C) 2008 John Stumpo
+# Copyright (C) 2008-2009 John Stumpo
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,11 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-!include ".\Revision.nsh"
+!include "..\revtag\revtag.nsh"
 
 !include "MUI2.nsh"
 
-Name "Kexec Driver r${DRIVER_REVISION}"
+Name "Kexec Driver r${SVN_REVISION}"
 OutFile KexecDriver.exe
 
 SetCompressor zlib
@@ -30,21 +30,21 @@ RequestExecutionLevel admin
 !define MUI_LICENSEPAGE_RADIOBUTTONS
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
+!insertmacro MUI_PAGE_LICENSE "..\LICENSE.txt"
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "1.0.0.${DRIVER_NSI_REVISION}"
+VIProductVersion "1.0.0.${SVN_REVISION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "Kexec Driver Setup"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${DRIVER_NSI_REVISION})"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${SVN_REVISION})"
 VIAddVersionKey /LANG=1033 "InternalName" "KexecDriver.exe"
-VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008 John Stumpo.  GNU GPL v3 or later."
+VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008-2009 John Stumpo.  GNU GPL v3 or later."
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecDriver.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${DRIVER_NSI_REVISION})"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${SVN_REVISION})"
 
 ShowInstDetails show
 
@@ -53,7 +53,7 @@ Function .onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecDriverInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver r${DRIVER_REVISION} Setup is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver r${SVN_REVISION} Setup is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -78,8 +78,8 @@ NoDriverUninstall:
   # (Either it wasn't there, or we nuked it ourselves.)
 DoneDriverUninstall:
   SetOutPath $TEMP
-  File kexec.sys
-  File kexec.inf
+  File ..\driver\kexec.sys
+  File ..\driver\kexec.inf
   # Magic incantation to install through an INF file.
   # (This is the same thing that happens if you right click an INF and hit "Install".)
   # kexec.inf handles the uninstallation process itself, so we don't do that in NSIS.

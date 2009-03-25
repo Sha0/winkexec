@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,20 +15,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KEXEC_H
-#define KEXEC_H
+#ifndef KEXEC_DRIVER_BUFFER_H
+#define KEXEC_DRIVER_BUFFER_H
 
-/* Buffers to operate on */
-#define KEXEC_KERNEL 0
-#define KEXEC_INITRD 4
-#define KEXEC_KERNEL_COMMAND_LINE 8
+#include <ddk/ntddk.h>
 
-/* Operations */
-#define KEXEC_SET 1
-#define KEXEC_GET_SIZE 2
-#define KEXEC_GET 3
+typedef struct {
+  ULONG Size;
+  PVOID Data;
+  FAST_MUTEX Mutex;
+} KEXEC_BUFFER, *PKEXEC_BUFFER;
 
-/* Conveniently mask off either part of the ioctl code */
-#define KEXEC_OPERATION_MASK 0x00000003
+extern KEXEC_BUFFER KexecKernel;
+extern KEXEC_BUFFER KexecInitrd;
+extern KEXEC_BUFFER KexecKernelCommandLine;
+
+void KexecInitBuffer(PKEXEC_BUFFER KexecBuffer);
+void KexecFreeBuffer(PKEXEC_BUFFER KexecBuffer);
+NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data);
+NTSTATUS KexecGetBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID buf);
+ULONG KexecGetBufferSize(PKEXEC_BUFFER KexecBuffer);
 
 #endif

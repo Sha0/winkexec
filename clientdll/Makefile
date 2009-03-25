@@ -14,26 +14,22 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-include common.mk
+include ../common.mk
 
-SUBDIRS = revtag driver clientdll cliclient guiclient setup
+CFLAGS += -I../include
 
-all :
-	set -e; \
-for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir ; \
-done
-.PHONY : all
+KEXECCOMMON_DLL_OBJECTS = KexecCommon.o resource.o
+KEXECCOMMON_DLL_LIBS = -lkernel32 -lmsvcrt -ladvapi32 -luser32
+
+__main_target : KexecCommon.dll KexecCommon.lib
+
+# We use -mdll so then only DLLEXPORTed stuff is exported.
+KexecCommon.dll : $(KEXECCOMMON_DLL_OBJECTS)
+	$(CC) $(CFLAGS) -mdll -o KexecCommon.dll $(KEXECCOMMON_DLL_OBJECTS) $(KEXECCOMMON_DLL_LIBS)
+
+KexecCommon.lib : KexecCommon.dll KexecCommon.def
+	$(DLLTOOL) -l KexecCommon.lib -D KexecCommon.dll -d KexecCommon.def
 
 clean :
-	for dir in $(SUBDIRS); do \
-  $(MAKE) -C $$dir clean ; \
-done
+	-rm -f KexecCommon.dll KexecCommon.lib *.o
 .PHONY : clean
-
-
-KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
-	$(MAKENSIS) KexecSetup.nsi
-
-KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
-	$(MAKENSIS) KexecDriver.nsi

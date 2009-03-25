@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,13 +18,15 @@
 #include <winuser.h>
 #include <winver.h>
 
-#include "Revision.h"
+#include "resource.h"
+
+#include "../revtag/revtag.h"
 
 LANGUAGE 9, 1
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1, 0, 0, CLIENT_REVISION
- PRODUCTVERSION 1, 0, 0, CLIENT_REVISION
+ FILEVERSION 1, 0, 0, SVN_REVISION
+ PRODUCTVERSION 1, 0, 0, SVN_REVISION
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
  FILEOS VOS_NT_WINDOWS32
  FILETYPE VFT_APP
@@ -35,17 +37,30 @@ BEGIN
     BLOCK "040904B0"
     BEGIN
       VALUE "CompanyName", "John Stumpo"
-      VALUE "FileDescription", "Kexec for Windows"
-      VALUE "FileVersion", "1.0 (r" CLIENT_REVISION_STR ")"
-      VALUE "InternalName", "kexec.exe"
-      VALUE "LegalCopyright", L"\251 2008 John Stumpo.  GNU GPL v3 or later."
-      VALUE "OriginalFilename", "kexec.exe"
+      VALUE "FileDescription", "Kexec for Windows GUI"
+      VALUE "FileVersion", "1.0 (r" SVN_REVISION_STR ")"
+      VALUE "InternalName", "KexecGui.exe"
+      VALUE "LegalCopyright", L"\251 2008-2009 John Stumpo.  GNU GPL v3 or later."
+      VALUE "OriginalFilename", "KexecGui.exe"
       VALUE "ProductName", L"WinKexec"
-      VALUE "ProductVersion", "1.0 (r" CLIENT_REVISION_STR ")"
+      VALUE "ProductVersion", "1.0 (r" SVN_REVISION_STR ")"
     END
   END
   BLOCK "VarFileInfo"
   BEGIN
     VALUE "Translation", 0x409, 1200
   END
+END
+
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
+
+KEXEC_GUI_ICON ICON "../icon/Icon.ico"
+
+KEXEC_GUI_MAIN_DLG DIALOGEX 0, 0, 239, 63
+ STYLE WS_OVERLAPPED | WS_POPUP | WS_CAPTION | DS_FIXEDSYS |
+   WS_SYSMENU | DS_CENTER | WS_MINIMIZEBOX | WS_VISIBLE
+ CAPTION "WinKexec GUI"
+ FONT 8, "MS Shell Dlg", 0, 0, 1
+BEGIN
+ DEFPUSHBUTTON "OK", IDOK, 130, 10, 50, 14
 END

@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,7 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "KexecCommon.h"
+#define IN_KEXEC_COMMON
+#include <KexecCommon.h>
 
 /* Are we GUI? */
 BOOL isGui;
@@ -54,23 +55,11 @@ KEXEC_DLLEXPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
 {
   char buf[256];
   va_list args;
-  void WINAPI (*my_vsnprintf)(LPSTR, size_t, LPCSTR, va_list);
-  HMODULE msvcrt;
 
   va_start(args, flags);
 
   /* We can't KexecPerror() these errors or we could infinitely recurse... */
-  if (!(msvcrt = GetModuleHandle("msvcrt"))) {
-    MessageBox(NULL, KexecTranslateError(), "Opening msvcrt.dll",
-      MB_ICONERROR | MB_OK);
-    exit(EXIT_FAILURE);
-  }
-  if (!(my_vsnprintf = GetProcAddress(msvcrt, "_vsnprintf"))) {
-    MessageBox(NULL, KexecTranslateError(), "Locating _vsnprintf",
-      MB_ICONERROR | MB_OK);
-    exit(EXIT_FAILURE);
-  }
-  my_vsnprintf(buf, 255, fmtstr, args);
+  vsnprintf(buf, 255, fmtstr, args);
   buf[255] = '\0';
   MessageBox(parent, buf, title, flags);
   va_end(args);

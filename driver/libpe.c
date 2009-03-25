@@ -1,5 +1,7 @@
-/* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+/* libpe: Small library to do interesting things with PE
+ *   executables from kernel mode under Windows.
+ * Originally developed as part of WinKexec: kexec for Windows
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -13,6 +15,9 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ * This file is available under a proprietary license as well.
+ * Contact John Stumpo <stump@jstump.com> for details.
  */
 
 /* Some routines to work with PE files from kernel mode.
@@ -20,8 +25,7 @@
    hal.dll's HalReturnToFirmware() function is.  Feel free to
    use these in your own drivers too. */
 
-#include <ddk/ntddk.h>
-#include "KexecDriver.h"
+#include "libpe.h"
 
 /* M$ makes you declare it yourself... */
 int _snwprintf(PWCHAR buffer, size_t count, const PWCHAR format, ...);
@@ -214,7 +218,8 @@ DWORD PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
 DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
 {
   PIMAGE_IMPORT_DESCRIPTOR ImportDescriptor;
-  PIMAGE_THUNK_DATA NameThunk, CallThunk;
+  PIMAGE_THUNK_DATA NameThunk;
+  DWORD CallThunk;
   PIMAGE_IMPORT_BY_NAME NamedImport;
 
   if (!(ImportDescriptor = PeGetFirstImportDescriptor(PeFile)))

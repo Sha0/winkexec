@@ -1,5 +1,5 @@
 # WinKexec: kexec for Windows
-# Copyright (C) 2008 John Stumpo
+# Copyright (C) 2008-2009 John Stumpo
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,12 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-!include ".\Revision.nsh"
+!include "..\revtag\revtag.nsh"
 !include ".\EnvVarUpdate.nsh"
 
 !include "MUI2.nsh"
 
-Name "WinKexec r${CLIENT_REVISION}"
+Name "WinKexec r${SVN_REVISION}"
 OutFile KexecSetup.exe
 
 InstallDir "$PROGRAMFILES\WinKexec"
@@ -36,7 +36,7 @@ RequestExecutionLevel admin
 !define MUI_LICENSEPAGE_RADIOBUTTONS
 
 !insertmacro MUI_PAGE_WELCOME
-!insertmacro MUI_PAGE_LICENSE "LICENSE.txt"
+!insertmacro MUI_PAGE_LICENSE "..\LICENSE.txt"
 !insertmacro MUI_PAGE_COMPONENTS
 !insertmacro MUI_PAGE_DIRECTORY
 !insertmacro MUI_PAGE_INSTFILES
@@ -49,15 +49,15 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "1.0.0.${CLIENT_NSI_REVISION}"
+VIProductVersion "1.0.0.${SVN_REVISION}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "WinKexec Setup"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${CLIENT_NSI_REVISION})"
+VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${SVN_REVISION})"
 VIAddVersionKey /LANG=1033 "InternalName" "KexecSetup.exe"
-VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008 John Stumpo.  GNU GPL v3 or later."
+VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008-2009 John Stumpo.  GNU GPL v3 or later."
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecSetup.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${CLIENT_NSI_REVISION})"
+VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${SVN_REVISION})"
 
 ShowInstDetails show
 ShowUninstDetails show
@@ -67,7 +67,7 @@ Function .onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${CLIENT_REVISION} Setup is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${SVN_REVISION} Setup is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -76,7 +76,7 @@ Function un.onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecUninstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${CLIENT_REVISION} Uninstall is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${SVN_REVISION} Uninstall is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -100,9 +100,9 @@ NoKexecUninstall:
   # (Either it wasn't there, or we nuked it ourselves.)
 DoneKexecUninstall:
   SetOutPath $INSTDIR
-  File KexecCommon.dll
-  File kexec.exe
-  File KexecGui.exe
+  File ..\clientdll\KexecCommon.dll
+  File ..\cliclient\kexec.exe
+  File ..\guiclient\KexecGui.exe
   File KexecDriver.exe
   # Install the driver.
   ExecWait "$\"$INSTDIR\KexecDriver.exe$\" /S"
@@ -110,7 +110,7 @@ DoneKexecUninstall:
   # Make our InstallDirRegKey (and thus, the uninstaller!) useful.
   WriteRegStr HKLM "Software\WinKexec" InstallRoot $INSTDIR
   # Add us to Add/Remove Programs.
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec (r${CLIENT_REVISION})"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec (r${SVN_REVISION})"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "UninstallString" "$\"$INSTDIR\KexecUninstall.exe$\""
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "NoModify" 1
@@ -121,9 +121,9 @@ SectionEnd
 
 Section /o "Developer Components"
   SetOutPath $INSTDIR\devel
-  File kexec.h
-  File KexecCommon.h
-  File KexecCommon.lib
+  File ..\include\kexec.h
+  File ..\include\KexecCommon.h
+  File ..\clientdll\KexecCommon.lib
 SectionEnd
 
 Section "Uninstall"
