@@ -30,10 +30,3 @@ clean :
   $(MAKE) -C $$dir clean ; \
 done
 .PHONY : clean
-
-
-KexecSetup.exe : KexecDriver.exe KexecGui.exe kexec.exe KexecSetup.nsi EnvVarUpdate.nsh Revision.nsh LICENSE.txt
-	$(MAKENSIS) KexecSetup.nsi
-
-KexecDriver.exe : kexec.sys KexecDriver.nsi kexec.inf LICENSE.txt Revision.nsh
-	$(MAKENSIS) KexecDriver.nsi
