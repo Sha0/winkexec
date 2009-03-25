@@ -16,13 +16,15 @@
 
 include ../common.mk
 
+MAKENSISFLAGS = /V2
+
 __main_target : KexecSetup.exe KexecDriver.exe
 
 KexecSetup.exe : KexecDriver.exe
-	$(MAKENSIS) KexecSetup.nsi
+	$(MAKENSIS) $(MAKENSISFLAGS) KexecSetup.nsi
 
 KexecDriver.exe :
-	$(MAKENSIS) KexecDriver.nsi
+	$(MAKENSIS) $(MAKENSISFLAGS) KexecDriver.nsi
 
 clean :
 	-rm -f KexecSetup.exe KexecDriver.exe

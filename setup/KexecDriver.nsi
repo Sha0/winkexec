@@ -26,13 +26,20 @@ SetCompressor zlib
 RequestExecutionLevel admin
 
 !define MUI_ABORTWARNING
+!define MUI_UNABORTWARNING
 !define MUI_FINISHPAGE_NOAUTOCLOSE
+!define MUI_UNFINISHPAGE_NOAUTOCLOSE
 !define MUI_LICENSEPAGE_RADIOBUTTONS
 
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\LICENSE.txt"
 !insertmacro MUI_PAGE_INSTFILES
 !insertmacro MUI_PAGE_FINISH
+
+!insertmacro MUI_UNPAGE_WELCOME
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_UNPAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
 
@@ -47,6 +54,7 @@ VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
 VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${SVN_REVISION})"
 
 ShowInstDetails show
+ShowUninstDetails show
 
 Function .onInit
   # Allow only one instance at a time.
@@ -57,35 +65,41 @@ Function .onInit
     Abort
 FunctionEnd
 
+Function un.onInit
+  # Allow only one instance at a time.
+  System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecDriverUninstallerMutex") i .r1 ?e'
+  Pop $R0
+  StrCmp $R0 0 +3
+    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver r${SVN_REVISION} Uninstall is already running." /SD IDOK
+    Abort
+FunctionEnd
+
 Section "Kexec"
   # This really just chains an INF-based install (ugh!) of the driver.
-  # We're just NSISing it so it's a single file and we can pre-uninstall
-  # an existing driver if necessary.
-  # First, check if a driver is already installed, and, if so,
-  # figure out how to uninstall the driver.
-  ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString"
-  IfErrors NoDriverUninstall
-  # Remove it by doing what it wrote into the Registry.
-  DetailPrint "Found an existing kexec driver on the system."
-  DetailPrint "Removing it before installing this one."
-  ExpandEnvStrings $1 $0
-  ExecWait $1
-  Goto DoneDriverUninstall
-  # No driver was installed.
-NoDriverUninstall:
-  ClearErrors
-  # Now no driver is on the system.
-  # (Either it wasn't there, or we nuked it ourselves.)
-DoneDriverUninstall:
+  # We're just NSISing it so it's a single file.
   SetOutPath $TEMP
   File ..\driver\kexec.sys
   File ..\driver\kexec.inf
   # Magic incantation to install through an INF file.
   # (This is the same thing that happens if you right click an INF and hit "Install".)
-  # kexec.inf handles the uninstallation process itself, so we don't do that in NSIS.
   ExecWait "rundll32.exe setupapi.dll,InstallHinfSection DefaultInstall 132 $TEMP\kexec.inf"
-  # The INF install process drops kexec.sys into \windows\system32\drivers
-  # and kexec.inf into \windows\inf, so we don't need these anymore.
+  # These files now exist in their proper locations...
   Delete kexec.sys
   Delete kexec.inf
+  # Write the uninstaller.
+  WriteUninstaller "$SYSDIR\KexecDriverUninstall.exe"
+  # Add us to Add/Remove Programs.
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "DisplayName" "Kexec Driver (r${SVN_REVISION})"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString" "$\"$SYSDIR\KexecDriverUninstall.exe$\""
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "NoModify" 1
+  WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "NoRepair" 1
+SectionEnd
+
+Section "Uninstall"
+  SetOutPath $TEMP
+  File ..\driver\kexec.inf
+  ExecWait "rundll32.exe setupapi.dll,InstallHinfSection Uninstall 132 $TEMP\kexec.inf"
+  Delete kexec.inf
+  DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec"
+  Delete "$SYSDIR\KexecDriverUninstall.exe"
 SectionEnd

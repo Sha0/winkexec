@@ -129,12 +129,12 @@ SectionEnd
 Section "Uninstall"
   # Unload the driver.
   ExecWait "$\"$INSTDIR\kexec.exe$\" /u"
-  # Figure out how to uninstall the driver (if it's even there...)
+  # Check if the driver is there.
   ReadRegStr $0 HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString"
   IfErrors NoDriverUninstall
-  # Remove it by doing what it wrote into the Registry.
-  ExpandEnvStrings $1 $0
-  ExecWait $1
+  # Remove it.
+  ExecWait "$\"$SYSDIR\KexecDriverUninstall.exe$\" /S _?=$SYSDIR"
+  Delete "$SYSDIR\KexecDriverUninstall.exe"
   Goto DoneDriverUninstall
   # No driver was installed.
 NoDriverUninstall:

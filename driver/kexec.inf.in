@@ -25,12 +25,8 @@ Provider = %Author%
 ; Where stuff goes
 [DestinationDirs]
 DefaultDestDir = 12
-; Drivers into C:\Windows\System32\Drivers
-Kexec_SysFiles = 12
-; This file into C:\Windows\Inf
-Kexec_InfFiles = 10,inf
+Kexec_SysFiles = 12  ; into %SystemRoot%\System32\Drivers
 
-; <boilerplate>
 [SourceDisksNames]
 1 = "Kexec Installation Source Path"
 
@@ -42,54 +38,34 @@ kexec.sys = 1
 
 [Kexec]
 %Description% = DefaultInstall,kexec
-; </boilerplate>
 
 ; The stuff that's done on installation.
 [DefaultInstall.NT]
-CopyFiles = Kexec_SysFiles, Kexec_InfFiles
-AddReg = Kexec_RegistryEntries
+CopyFiles = Kexec_SysFiles
 
 [DefaultInstall.NT.Services]
 AddService = kexec,,Kexec_Service
 
 ; The stuff that's done on uninstallation.
 [Uninstall.NT]
-DelFiles = Kexec_SysFiles, Kexec_InfFiles
-DelReg = Kexec_RegistryEntries
+DelFiles = Kexec_SysFiles
 
 [Uninstall.NT.Services]
 DelService = kexec,0x00000200
 
-; Copied to C:\Windows\System32\Drivers
+; Copied to %SystemRoot%\System32\Drivers
 [Kexec_SysFiles]
 kexec.sys
-
-; Copied to C:\Windows\Inf
-[Kexec_InfFiles]
-kexec.inf
-
-; Added to the Registry - this adds us to Add/Remove Programs
-[Kexec_RegistryEntries]
-HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"DisplayName",,%Description% (r%Revision%)
-; This will call the Uninstall.* sections when we are uninstalled.
-HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"UninstallString",0x20000,"rundll32.exe setupapi.dll,InstallHinfSection Uninstall 132 %SystemRoot%\inf\kexec.inf"
-; Minor cosmetic fixes on Add/Remove Programs - the only valid operation is removal.
-HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"NoModify",0x10001,1
-HKLM,SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\Kexec,"NoRepair",0x10001,1
 
 ; Register the driver.
 [Kexec_Service]
 DisplayName = %Description%
-; Kernel module
-ServiceType = 1
-; Manually loaded
-StartType = 3
-; Do nothing on error
-ErrorControl = 1
+ServiceType = 1   ; kernel module
+StartType = 3     ; manually loaded
+ErrorControl = 1  ; do nothing on error
 ServiceBinary = %12%\kexec.sys
 
 ; Substitution strings for all above sections
 [Strings]
 Author = "John Stumpo"
 Description = "Kexec Driver"
-Revision = @SVN_REVISION_STR@
