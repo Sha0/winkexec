@@ -97,8 +97,12 @@ end:
 /* Called before shutdown - use this chance to hook HalReturnToFirmware() */
 NTSTATUS DDKAPI KexecShutdown(PDEVICE_OBJECT DeviceObject KEXEC_UNUSED, PIRP Irp)
 {
-  Irp->IoStatus.Status = KexecHookReboot();
+  NTSTATUS status;
+
+  status = KexecHookReboot();
+
+  Irp->IoStatus.Status = status;
   Irp->IoStatus.Information = 0;
   IoCompleteRequest(Irp, IO_NO_INCREMENT);
-  return STATUS_SUCCESS;
+  return status;
 }

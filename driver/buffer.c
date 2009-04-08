@@ -17,58 +17,81 @@
 
 #include "buffer.h"
 
+#define LOCK_BUFFER(buf) ExAcquireFastMutex(&((buf)->Mutex))
+#define UNLOCK_BUFFER(buf) ExReleaseFastMutex(&((buf)->Mutex))
+
 /* Buffers for the data we need to keep track of */
 KEXEC_BUFFER KexecKernel;
 KEXEC_BUFFER KexecInitrd;
 KEXEC_BUFFER KexecKernelCommandLine;
 
 /* Set a buffer to be empty. */
-void KexecInitBuffer(PKEXEC_BUFFER KexecBuffer)
+static void KexecClearBuffer(PKEXEC_BUFFER KexecBuffer)
 {
-  ExAcquireFastMutex(&KexecBuffer->Mutex);
+  ASSERT(KeGetCurrentIrql() == APC_LEVEL);
   KexecBuffer->Size = 0;
   KexecBuffer->Data = NULL;
-  ExReleaseFastMutex(&KexecBuffer->Mutex);
 }
 
 /* Free the contents (if any) of a buffer, and reinitialize it. */
-void KexecFreeBuffer(PKEXEC_BUFFER KexecBuffer)
+static void KexecFreeBuffer(PKEXEC_BUFFER KexecBuffer)
 {
-  ExAcquireFastMutex(&KexecBuffer->Mutex);
+  ASSERT(KeGetCurrentIrql() == APC_LEVEL);
   if (KexecBuffer->Data)
     ExFreePool(KexecBuffer->Data);
-  ExReleaseFastMutex(&KexecBuffer->Mutex);
-  KexecInitBuffer(KexecBuffer);
+  KexecClearBuffer(KexecBuffer);
+}
+
+/* Initialize a buffer. */
+void KexecInitBuffer(PKEXEC_BUFFER KexecBuffer)
+{
+  ExInitializeFastMutex(&KexecBuffer->Mutex);
+  LOCK_BUFFER(KexecBuffer);
+  KexecClearBuffer(KexecBuffer);
+  UNLOCK_BUFFER(KexecBuffer);
+}
+
+/* Destroy a buffer. */
+void KexecDestroyBuffer(PKEXEC_BUFFER KexecBuffer)
+{
+  LOCK_BUFFER(KexecBuffer);
+  KexecFreeBuffer(KexecBuffer);
+  UNLOCK_BUFFER(KexecBuffer);
 }
 
 /* Load data into a buffer. */
 NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data)
 {
+  LOCK_BUFFER(KexecBuffer);
   KexecFreeBuffer(KexecBuffer);
-  ExAcquireFastMutex(&KexecBuffer->Mutex);
   KexecBuffer->Data = ExAllocatePoolWithTag(NonPagedPool,
     size, TAG('K', 'x', 'e', 'c'));
-  if (!KexecBuffer->Data)
+  if (!KexecBuffer->Data) {
+    UNLOCK_BUFFER(KexecBuffer);
     return STATUS_INSUFFICIENT_RESOURCES;
+  }
   KexecBuffer->Size = size;
   RtlCopyMemory(KexecBuffer->Data, data, size);
-  ExReleaseFastMutex(&KexecBuffer->Mutex);
+  UNLOCK_BUFFER(KexecBuffer);
   return STATUS_SUCCESS;
 }
 
 /* Retrieve data from a buffer. */
 NTSTATUS KexecGetBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID buf)
 {
-  ExAcquireFastMutex(&KexecBuffer->Mutex);
-  if (size < KexecBuffer->Size)
+  LOCK_BUFFER(KexecBuffer);
+  if (size < KexecBuffer->Size) {
+    UNLOCK_BUFFER(KexecBuffer);
     return STATUS_INSUFFICIENT_RESOURCES;
+  }
   RtlCopyMemory(buf, KexecBuffer->Data, KexecBuffer->Size);
-  ExReleaseFastMutex(&KexecBuffer->Mutex);
+  UNLOCK_BUFFER(KexecBuffer);
   return STATUS_SUCCESS;
 }
 
 /* Get the size of a buffer. */
 ULONG KexecGetBufferSize(PKEXEC_BUFFER KexecBuffer)
 {
+  /* Just one value grab - no lock needed. */
   return KexecBuffer->Size;
 }

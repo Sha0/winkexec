@@ -34,11 +34,9 @@ void DDKAPI DriverUnload(PDRIVER_OBJECT DriverObject)
   IoDeleteDevice(DriverObject->DeviceObject);
 
   /* Don't waste kernel memory! */
-  KexecFreeBuffer(&KexecKernel);
-  KexecFreeBuffer(&KexecInitrd);
-  KexecFreeBuffer(&KexecKernelCommandLine);
-
-  return;
+  KexecDestroyBuffer(&KexecKernel);
+  KexecDestroyBuffer(&KexecInitrd);
+  KexecDestroyBuffer(&KexecKernelCommandLine);
 }
 
 /* The entry point - this is called when kexec.sys is loaded, and it
@@ -57,12 +55,7 @@ NTSTATUS DDKAPI DriverEntry(PDRIVER_OBJECT DriverObject,
   /* Allow kexec.sys to be unloaded. */
   DriverObject->DriverUnload = DriverUnload;
 
-  /* Init the locks on the buffers. */
-  ExInitializeFastMutex(&KexecKernel.Mutex);
-  ExInitializeFastMutex(&KexecInitrd.Mutex);
-  ExInitializeFastMutex(&KexecKernelCommandLine.Mutex);
-
-  /* Init the buffers themselves. */
+  /* Init the buffers. */
   KexecInitBuffer(&KexecKernel);
   KexecInitBuffer(&KexecInitrd);
   KexecInitBuffer(&KexecKernelCommandLine);

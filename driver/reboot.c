@@ -20,14 +20,33 @@
 #include "libpe.h"
 #include "linuxboot.h"
 #include "reboot.h"
+#include "buffer.h"
 
-static void KexecDoReboot(void)
+/* This isn't in MinGW's headers... */
+#ifdef __MINGW32__
+typedef enum {
+  HalRebootRoutine = 3,
+} FIRMWARE_REENTRY;
+#endif
+
+typedef VOID(*halReturnToFirmware_t)(FIRMWARE_REENTRY);
+
+halReturnToFirmware_t real_HalReturnToFirmware;
+
+/* Our "enhanced" version of HalReturnToFirmware.
+   Drops through if we don't have a kernel to load or if an invalid
+   operation type is specified.  The guts of ntoskrnl.exe will be
+   tricked into calling this after everything is ready for "reboot."  */
+static VOID KexecDoReboot(FIRMWARE_REENTRY RebootType)
 {
-  KexecLinuxBoot();
-  /* Linux boot failed... the only sensible thing is a BSoD (if we can...)
-     If KexecLinuxBoot() has messed things up thoroughly enough, we will likely
-     get a triple fault here, which reboots the machine (for real) anyway... */
-  KeBugCheckEx(0x42424242, 0x42424242, 0x42424242, 0x42424242, 0x42424242);
+  if (RebootType == HalRebootRoutine && KexecGetBufferSize(&KexecKernel)) {
+    KexecLinuxBoot();
+    /* Linux boot failed... the only sensible thing is a BSoD (if we can...)
+       If KexecLinuxBoot() has messed things up thoroughly enough, we will likely
+       get a triple fault here, which reboots the machine (for real) anyway... */
+    KeBugCheckEx(0x42424242, 0x42424242, 0x42424242, 0x42424242, 0x42424242);
+  } else
+    real_HalReturnToFirmware(RebootType);
 }
 
 NTSTATUS KexecHookReboot(void)
@@ -35,9 +54,8 @@ NTSTATUS KexecHookReboot(void)
   PVOID Ntoskrnl = NULL;
   PVOID KernelBase;
   DWORD ImportOffset;
-  PVOID Target;
+  halReturnToFirmware_t* Target;
   PMDL Mdl;
-  void DDKAPI (*MyMmBuildMdlForNonPagedPool)(PMDL);
   int i;
   PWCHAR KernelFilenames[] = {L"ntoskrnl.exe", L"ntkrnlpa.exe",
                               L"ntkrnlmp.exe", L"ntkrpamp.exe", NULL};
@@ -73,23 +91,15 @@ NTSTATUS KexecHookReboot(void)
     return STATUS_UNSUCCESSFUL;
   }
 
-  /* Cygwin doesn't have this function... */
-  MyMmBuildMdlForNonPagedPool =
-    KernelBase + PeGetExportFunction(Ntoskrnl, "MmBuildMdlForNonPagedPool");
-  if (MyMmBuildMdlForNonPagedPool == KernelBase) {
-    ExFreePool(Ntoskrnl);
-    return STATUS_UNSUCCESSFUL;
-  }
-
   ExFreePool(Ntoskrnl);
 
-  Target = KernelBase + ImportOffset;
+  Target = (halReturnToFirmware_t*)(KernelBase + ImportOffset);
 
   /* Here we go!
      We need to unprotect the chunk of RAM the import table is in. */
-  if (!(Mdl = IoAllocateMdl(Target, sizeof(void(**)(void)), FALSE, FALSE, NULL)))
+  if (!(Mdl = IoAllocateMdl(Target, sizeof(halReturnToFirmware_t), FALSE, FALSE, NULL)))
     return STATUS_UNSUCCESSFUL;
-  MyMmBuildMdlForNonPagedPool(Mdl);
+  MmBuildMdlForNonPagedPool(Mdl);
   Mdl->MdlFlags |= MDL_MAPPED_TO_SYSTEM_VA;
   if (!(Target = MmMapLockedPagesSpecifyCache(Mdl, KernelMode, MmNonCached,
     NULL, FALSE, HighPagePriority)))
@@ -97,7 +107,8 @@ NTSTATUS KexecHookReboot(void)
     IoFreeMdl(Mdl);
     return STATUS_UNSUCCESSFUL;
   }
-  *(void(**)(void))Target = KexecDoReboot;  /* This is it! */
+  real_HalReturnToFirmware = *Target;
+  *Target = KexecDoReboot;  /* This is it! */
   MmUnmapLockedPages(Target, Mdl);
   IoFreeMdl(Mdl);
 
