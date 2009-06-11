@@ -218,8 +218,7 @@ DWORD PeGetExportFunction(PVOID PeFile, PCHAR FunctionName)
 DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
 {
   PIMAGE_IMPORT_DESCRIPTOR ImportDescriptor;
-  PIMAGE_THUNK_DATA NameThunk;
-  DWORD CallThunk;
+  PIMAGE_THUNK_DATA NameThunk, CallThunk;
   PIMAGE_IMPORT_BY_NAME NamedImport;
 
   if (!(ImportDescriptor = PeGetFirstImportDescriptor(PeFile)))
@@ -234,12 +233,12 @@ DWORD PeGetImportPointer(PVOID PeFile, PCHAR DllName, PCHAR FunctionName)
 
 FoundDll:
   for (NameThunk = PeConvertRva(PeFile, ImportDescriptor->OriginalFirstThunk),
-       CallThunk = ImportDescriptor->FirstThunk;
+       CallThunk = (PIMAGE_THUNK_DATA)ImportDescriptor->FirstThunk;
     NameThunk->u1.AddressOfData; NameThunk++, CallThunk++)
   {
     NamedImport = PeConvertRva(PeFile, NameThunk->u1.AddressOfData);
     if (!strcmp(NamedImport->Name, FunctionName))
-      return CallThunk;
+      return (DWORD)CallThunk;
   }
   return (DWORD)NULL;
 }
