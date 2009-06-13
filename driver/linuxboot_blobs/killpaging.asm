@@ -66,16 +66,16 @@ in16bitpmode:
   lidt [real_idttag]
 
   ; Apply the real mode segments.
-  mov ax,0x0800
+  xor ax,ax
   mov ds,ax
   mov es,ax
   mov fs,ax
   mov gs,ax
   mov ss,ax
-  mov sp,0x7ffe  ; just below the kernel map
+  mov sp,0x7ffe  ; just below the real mode code
 
   ; Jump to the real-mode code.
-  jmp 0x0800:0x0000
+  jmp 0x0000:0x8000
 
   ; The global descriptor table used for the switch back to real mode
   align 8
