@@ -15,12 +15,18 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KEXEC_DRIVER_LINUXBOOT_H
-#define KEXEC_DRIVER_LINUXBOOT_H
+#ifndef KEXEC_DRIVER_UTIL_H
+#define KEXEC_DRIVER_UTIL_H
 
 #include <ddk/ntddk.h>
 
-/* Does not return. */
-void KexecLinuxBoot(void);
+void util_cli(void);
+void util_hlt(void); /* Does not return. */
+
+int util_pae_enabled(void);
+DWORD util_get_cr3(void);
+void util_invlpg(DWORD page_address);
+/* Because KeGetCurrentProcessorNumber() epically fails under MinGW. */
+ULONG util_current_processor(void);
 
 #endif

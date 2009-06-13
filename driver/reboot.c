@@ -31,7 +31,7 @@ typedef enum {
 
 typedef VOID(*halReturnToFirmware_t)(FIRMWARE_REENTRY);
 
-halReturnToFirmware_t real_HalReturnToFirmware;
+static halReturnToFirmware_t real_HalReturnToFirmware;
 
 /* Our "enhanced" version of HalReturnToFirmware.
    Drops through if we don't have a kernel to load or if an invalid
@@ -39,14 +39,13 @@ halReturnToFirmware_t real_HalReturnToFirmware;
    tricked into calling this after everything is ready for "reboot."  */
 static VOID KexecDoReboot(FIRMWARE_REENTRY RebootType)
 {
-  if (RebootType == HalRebootRoutine && KexecGetBufferSize(&KexecKernel)) {
+  if (RebootType == HalRebootRoutine && KexecGetBufferSize(&KexecKernel))
     KexecLinuxBoot();
-    /* Linux boot failed... the only sensible thing is a BSoD (if we can...)
-       If KexecLinuxBoot() has messed things up thoroughly enough, we will likely
-       get a triple fault here, which reboots the machine (for real) anyway... */
-    KeBugCheckEx(0x42424242, 0x42424242, 0x42424242, 0x42424242, 0x42424242);
-  } else
+  else
     real_HalReturnToFirmware(RebootType);
+
+  /* Should never happen. */
+  KeBugCheckEx(0x42424242, 0x42424242, 0x42424242, 0x42424242, 0x42424242);
 }
 
 NTSTATUS KexecHookReboot(void)

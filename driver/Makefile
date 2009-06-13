@@ -18,7 +18,7 @@ include ../common.mk
 
 CFLAGS += -I../include
 
-KEXEC_SYS_OBJECTS = buffer.o entry.o io.o libpe.o reboot.o resource.o linuxboot.o
+KEXEC_SYS_OBJECTS = buffer.o entry.o io.o libpe.o reboot.o resource.o linuxboot.o util.o
 KEXEC_SYS_LIBS = -lntoskrnl -lhal
 
 __main_target : kexec.sys kexec.inf
@@ -31,7 +31,12 @@ kexec.inf : kexec.inf.in
 	$(PYTHON) ../revtag/revtag.py --tag-file .. kexec.inf.in >kexec.inf
 
 clean :
-	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin
+	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin linuxboot_blobs/*.h
 .PHONY : clean
 
-linuxboot.o : linuxboot_blobs/flatpmode.bin linuxboot_blobs/realmode.bin
+linuxboot.o : linuxboot_blobs/killpaging.h linuxboot_blobs/realmode.h
+
+.bin.h :
+	$(PYTHON) bin2h.py $< $@ "$(shell basename $< | sed -e 's/[^a-z]/_/g')"
+
+.SUFFIXES : .bin .h
