@@ -22,14 +22,17 @@
 #include "reboot.h"
 #include "buffer.h"
 
-/* This isn't in MinGW's headers... */
-#ifdef __MINGW32__
-typedef enum {
-  HalRebootRoutine = 3,
-} FIRMWARE_REENTRY;
-#endif
+/* NOTE: This is undocumented! */
+typedef enum _FIRMWARE_REENTRY {
+  HalHaltRoutine,
+  HalPowerDownRoutine,
+  HalRestartRoutine,
+  HalRebootRoutine,
+  HalInteractiveModeRoutine,
+  HalMaximumRoutine,
+} FIRMWARE_REENTRY, *PFIRMWARE_REENTRY;
 
-typedef VOID(*halReturnToFirmware_t)(FIRMWARE_REENTRY);
+typedef VOID NTAPI(*halReturnToFirmware_t)(FIRMWARE_REENTRY);
 
 static halReturnToFirmware_t real_HalReturnToFirmware;
 
@@ -37,7 +40,7 @@ static halReturnToFirmware_t real_HalReturnToFirmware;
    Drops through if we don't have a kernel to load or if an invalid
    operation type is specified.  The guts of ntoskrnl.exe will be
    tricked into calling this after everything is ready for "reboot."  */
-static VOID KexecDoReboot(FIRMWARE_REENTRY RebootType)
+static VOID NTAPI KexecDoReboot(FIRMWARE_REENTRY RebootType)
 {
   if (RebootType == HalRebootRoutine && KexecGetBufferSize(&KexecKernel))
     KexecLinuxBoot();

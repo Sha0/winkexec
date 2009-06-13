@@ -151,13 +151,13 @@ static void DoLinuxBoot(void)
        the next page below the real-mode code.  */
     if (!(page_directory[0] & 0x00000001))
       page_directory[0] = 0x00007000;
-    page_directory[0] |= 0x00000033;
+    page_directory[0] |= 0x00000023;
 
     /* Map the page table and tweak it to our needs. */
     addr.HighPart = 0x00000000;
     addr.LowPart = page_directory[0] & 0xfffff000;
     page_table = MmMapIoSpace(addr, 4096, MmNonCached);
-    page_table[0x90] = 0x00090033;
+    page_table[0x90] = 0x00090023;
     MmUnmapIoSpace(page_table, 4096);
 
     MmUnmapIoSpace(page_directory, 4096);
@@ -181,9 +181,6 @@ static VOID KexecThreadProc(PVOID Context KEXEC_UNUSED)
   KIRQL irql;
   HANDLE hThread;
   ULONG currentProcessor;
-
-  if (KeGetCurrentIrql() < HIGH_LEVEL)
-    KeRaiseIrql(HIGH_LEVEL, &irql);  /* never to be lowered again... */
 
   util_cli();  /* abandon all interrupts, ye who execute here! */
   currentProcessor = util_current_processor();

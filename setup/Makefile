@@ -16,7 +16,7 @@
 
 include ../common.mk
 
-MAKENSISFLAGS = /V2
+MAKENSISFLAGS = -V2
 
 __main_target : KexecSetup.exe KexecDriver.exe
 
