@@ -178,7 +178,6 @@ static void DoLinuxBoot(void)
    Does not return.  */
 static VOID KexecThreadProc(PVOID Context KEXEC_UNUSED)
 {
-  KIRQL irql;
   HANDLE hThread;
   ULONG currentProcessor;
 

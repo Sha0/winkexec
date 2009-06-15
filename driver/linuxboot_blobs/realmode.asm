@@ -130,17 +130,18 @@ theGreatReshuffling:
   mov dword [0x00007000], 0x00090021
 
   ; Build the page directory at 0x00090000.
-  ; We only need two page tables: one to identity-map the entire first
-  ; megabyte of physical RAM (where we are), and one to let us map the areas
-  ; of higher RAM that we need in order to move stuff around.
+  ; We only need one page table: it will identity-map the entire first
+  ; megabyte of physical RAM (where we are), and let us map the areas
+  ; of higher RAM that we need into the second megabyte in order to
+  ; move stuff around.
   mov ecx, 1024
   mov edi, 0x00090000
   rep stosd
   mov dword [0x00090000], 0x00091023
-  mov dword [0x00090008], 0x00092023
 
-  ; Build the page table for the first megabyte of address space
-  ; at 0x00091000.  This is entirely an identity mapping.
+  ; Build the page table for the first two megabytes of address space
+  ; at 0x00091000.  The first megabyte is entirely an identity mapping;
+  ; the second megabyte is left unmapped.
   mov eax, 0x00000023
   mov edi, 0x00091000
 .writeAnotherEntry:
@@ -150,12 +151,6 @@ theGreatReshuffling:
   cmp eax, 0x00100000
   jb .writeAnotherEntry
 
-  ; Build the second page table.  This is all zeros for now.
-  xor eax, eax
-  mov edi, 0x00092000
-  mov ecx, 1024
-  rep stosd
-
   ; Turn on paging.
   mov eax, 0x00007000
   mov cr3, eax
@@ -163,7 +158,14 @@ theGreatReshuffling:
   or eax, 0x80000000
   mov cr0, eax
 
-  ; This code is a stump.  You can help by expanding it.
+  ; Call the C code to perform the necessary page swapping.
+  ; Pass it pointers to our address variables.
+  push dword cmdline_size
+  push dword cmdline_base
+  push dword initrd_base
+  push dword kernel_base
+  call c_code
+  add esp, 16
 
   ; Turn off paging.
   mov eax, cr0
@@ -242,3 +244,7 @@ gdtend:
 gdttag:
   gdtsize dw (gdtend - gdtstart - 1)
   gdtptr dd gdtstart
+
+  ; Incorporate the C code.
+  times (0x1000 - ($ - $$)) db 0x00
+  c_code incbin 'linuxboot_blobs/reassemble.bin'

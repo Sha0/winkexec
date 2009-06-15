@@ -29,6 +29,7 @@ else
 MAKENSIS = makensis
 endif
 NASM = nasm
+OBJCOPY = $(CROSS)objcopy
 PYTHON = python
 WINDRES = $(CROSS)windres
 
