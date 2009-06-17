@@ -62,10 +62,15 @@ void KexecDestroyBuffer(PKEXEC_BUFFER KexecBuffer)
 /* Load data into a buffer. */
 NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data)
 {
+  ULONG alloc_size;
+  /* Round the size up to the nearest multiple of 4096 to ensure that
+     the buffer ends up on a page boundary.  */
+  alloc_size = (size + 4095) & 0xffff000;
+
   LOCK_BUFFER(KexecBuffer);
   KexecFreeBuffer(KexecBuffer);
   KexecBuffer->Data = ExAllocatePoolWithTag(NonPagedPool,
-    size, TAG('K', 'x', 'e', 'c'));
+    alloc_size, TAG('K', 'x', 'e', 'c'));
   if (!KexecBuffer->Data) {
     UNLOCK_BUFFER(KexecBuffer);
     return STATUS_INSUFFICIENT_RESOURCES;
