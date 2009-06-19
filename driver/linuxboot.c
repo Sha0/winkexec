@@ -133,14 +133,54 @@ static void DoLinuxBoot(void)
     /* We have PAE.  Stuff will be a bit different.
        0x00090000 = directory 0, table 0, page 0x90, offset 0x000
      */
-    DbgPrint("kexec: *** PANIC: PAE not yet supported!\n");
-    KeBugCheckEx(0x00031337, 0x00000002, 0x00000000, 0x00000000, 0x00000000);
+    DWORD* page_directory_pointer_table;
+    DWORD* page_directory;
+    DWORD* page_table;
+
+    /* Where is the page directory pointer table? */
+    addr.HighPart = 0x00000000;
+    addr.LowPart = util_get_cr3() & 0xfffff000;
+    page_directory_pointer_table = MmMapIoSpace(addr, 4096, MmNonCached);
+
+    /* If the page directory isn't present, use
+       the second page below the real mode code.  */
+    if (!(page_directory_pointer_table[0] & 0x00000001)) {
+      page_directory_pointer_table[0] = 0x00006000;
+      page_directory_pointer_table[1] = 0x00000000;
+    }
+    page_directory_pointer_table[0] |= 0x00000021;
+    page_directory_pointer_table[1] &= 0x7fffffff;
+
+    /* Where is the page directory? */
+    addr.HighPart = page_directory_pointer_table[1];
+    addr.LowPart = page_directory_pointer_table[0] & 0xfffff000;
+    page_directory = MmMapIoSpace(addr, 4096, MmNonCached);
+
+    /* If the page table isn't present, use
+       the next page below the real mode code.  */
+    if (!(page_directory[0] & 0x00000001)) {
+      page_directory[0] = 0x00007000;
+      page_directory[1] = 0x00000000;
+    }
+    page_directory[0] |= 0x00000023;
+    page_directory[1] &= 0x7fffffff;
+
+    /* Map the page table and tweak it to our needs. */
+    addr.HighPart = page_directory[1];
+    addr.LowPart = page_directory[0] & 0xfffff000;
+    page_table = MmMapIoSpace(addr, 4096, MmNonCached);
+    page_table[0x120] = 0x00090023;
+    page_table[0x121] = 0x00000000;
+    MmUnmapIoSpace(page_table, 4096);
+
+    MmUnmapIoSpace(page_directory, 4096);
+    MmUnmapIoSpace(page_directory_pointer_table, 4096);
   } else {
     /* No PAE - it's the original x86 paging mechanism.
        0x00090000 = table 0, page 0x90, offset 0x000
      */
-    DWORD* page_table;
     DWORD* page_directory;
+    DWORD* page_table;
 
     /* Where is the page directory? */
     addr.HighPart = 0x00000000;
