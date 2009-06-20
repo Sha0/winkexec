@@ -16,6 +16,7 @@
  */
 
 #include "buffer.h"
+#include "sha1.h"
 
 #define LOCK_BUFFER(buf) ExAcquireFastMutex(&((buf)->Mutex))
 #define UNLOCK_BUFFER(buf) ExReleaseFastMutex(&((buf)->Mutex))
@@ -25,12 +26,20 @@ KEXEC_BUFFER KexecKernel;
 KEXEC_BUFFER KexecInitrd;
 KEXEC_BUFFER KexecKernelCommandLine;
 
+/* Update the SHA1 hash of a buffer's contents. */
+static void KexecUpdateBufferHash(PKEXEC_BUFFER KexecBuffer)
+{
+  ASSERT(KeGetCurrentIrql() == APC_LEVEL);
+  sha1(KexecBuffer->Sha1Hash, KexecBuffer->Data, KexecBuffer->Size);
+}
+
 /* Set a buffer to be empty. */
 static void KexecClearBuffer(PKEXEC_BUFFER KexecBuffer)
 {
   ASSERT(KeGetCurrentIrql() == APC_LEVEL);
   KexecBuffer->Size = 0;
   KexecBuffer->Data = NULL;
+  KexecUpdateBufferHash(KexecBuffer);
 }
 
 /* Free the contents (if any) of a buffer, and reinitialize it. */
@@ -77,6 +86,7 @@ NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data)
   }
   KexecBuffer->Size = size;
   RtlCopyMemory(KexecBuffer->Data, data, size);
+  KexecUpdateBufferHash(KexecBuffer);
   UNLOCK_BUFFER(KexecBuffer);
   return STATUS_SUCCESS;
 }

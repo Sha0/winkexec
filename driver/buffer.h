@@ -24,6 +24,7 @@ typedef struct {
   ULONG Size;
   PVOID Data;
   FAST_MUTEX Mutex;
+  unsigned char Sha1Hash[20];
 } KEXEC_BUFFER, *PKEXEC_BUFFER;
 
 extern KEXEC_BUFFER KexecKernel;
