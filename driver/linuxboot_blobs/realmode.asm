@@ -14,21 +14,69 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-bits 16
+bits 32
 
-; The real-mode part of the Linux bootloader.
 ; This gets compiled into the data segment of kexec.sys as a flat binary.
-; It is loaded at absolute address 0x00008000, then jumped to once
-; real mode is re-entered.  The address used is 0x0000:0x8000.
+; kexec.sys will load this to physical address 0x00008000, identity-map
+; that piece of RAM, and finally jump to it so we can turn off paging,
+; drop back to real mode, build a minimal protected mode environment,
+; use that to reassemble the kernel and initrd, and finally boot the kernel.
 
 ; Where is stuff at the moment?
 ; 0x00008000 = this code
 ; 0x00010000 = kernel map
-; 0x00090000 = formerly the 32-bit stub code, but now scratch
 ; somewhere further up    = Windows
 ; somewhere else up there = the kernel and initrd we're going to load
 
   org 0x00008000
+
+  ; Paging, be gone!
+  mov eax,cr0
+  and eax,0x7fffffff
+  mov cr0,eax
+  xor eax,eax
+  mov cr3,eax  ; Paging, be very gone.  (Nuke the TLB.)
+
+  ; Install the new GDT.
+  lgdt [gdttag]
+
+  ; Reload the segment registers (and stack) with
+  ; 16-bit real-mode-appropriate descriptors starting
+  ; at the base of memory.
+  mov eax,0x00000020
+  mov ds,ax
+  mov es,ax
+  mov fs,ax
+  mov gs,ax
+  mov ss,ax
+  mov esp,0x00007ffe  ; Stack accessible in real mode.
+
+  ; Enter 16-bit protected mode through the new GDT.
+  jmp 0x0018:in16bitpmode
+in16bitpmode:
+  bits 16
+
+  ; Drop back to real mode.
+  mov eax,cr0
+  and al,0xfe
+  mov cr0,eax
+
+  ; Apply the real mode interrupt vector table.
+  lidt [real_idttag]
+
+  ; Apply the real mode segments.
+  xor ax,ax
+  mov ds,ax
+  mov es,ax
+  mov fs,ax
+  mov gs,ax
+  mov ss,ax
+  mov sp,0x7ffe  ; just below the real mode code
+
+  ; Make an absolute jump below to put us in full-blown 16-bit real mode.
+  jmp 0x0000:in16bitrmode
+in16bitrmode:
+  bits 16
 
   ; Leetness! We've entered 1980s-land!  Our task now is to reassemble
   ; and boot the kernel.  Hopefully the BIOS services (at least int 0x10
@@ -230,7 +278,8 @@ banner db 'WinKexec: Linux bootloader implemented as a Windows device driver',\
 noPAEmsg db 'This processor does not support PAE.',0x0d,0x0a,\
   'PAE support is required in order to use WinKexec.',0x0d,0x0a,0x00
 
-; The global descriptor table used for the kernel reshuffling
+; The global descriptor table used for the deactivation of paging,
+; the initial switch back to real mode, the kernel reshuffling,
 ; and the switch back to real mode afterwards.
   align 8
 gdtstart:
@@ -245,6 +294,10 @@ gdttag:
   gdtsize dw (gdtend - gdtstart - 1)
   gdtptr dd gdtstart
 
+real_idttag:
+  real_idtsize dw 0x03ff
+  real_idtptr dd 0x00000000
+
   ; Incorporate the C code.
-  times (0x1000 - ($ - $$)) db 0x00
+  times (0x1000 - ($ - $$)) db 0x00  ; pad to multiple of 4KB
   c_code incbin 'linuxboot_blobs/reassemble.bin'

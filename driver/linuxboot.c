@@ -22,8 +22,8 @@
 #include "util.h"  /* assembly routines - we avoid inline assembly
                       in case we try to port to another compiler.  */
 
-/* Binary blobs that we are going to need. */
-#include "linuxboot_blobs/killpaging.h"
+/* A binary blob that we are going to need -
+   namely, the boot code that will finish the job for us.  */
 #include "linuxboot_blobs/realmode.h"
 
 /* By the time this is called, Windows thinks it just handed control over
@@ -42,11 +42,18 @@ static void DoLinuxBoot(void)
        (We will use 64-bit pointers just in case of PAE.)
        Maximum length: 65536 pointers (using up to address 0x00090000),
          allowing up to 256 MB total kernel+initrd size.
-     At physical address 0x00090000, we will copy the 32-bit stub code that
-       will be used to escape from protected mode.  This will then become
-       a scratch area for things like page tables.
-     At physical address 0x00008000, we will copy the code that will run in
-       16-bit real mode, that reassembles and boots the Linux kernel.
+
+       (Addendum: That cake is a lie, but for now it's still the way we
+        do things.  Windows seems to like to put the page directory there,
+        and when we encroach upon it [by way of overwriting it with garbage]
+        Bad Things(tm) tend to happen, like triple faults.  The code is
+        currently being prepared to generate page tables instead for the
+        kernel map.)
+
+     At physical address 0x00008000, we will copy the code that will be used
+       to escape from protected mode, set things up for the boot, and
+       reassemble and boot the Linux kernel.  In this file, we refer to that
+       code as the "boot code."
    */
   DWORD* kernel_map;
   DWORD* current_position;
@@ -104,27 +111,19 @@ static void DoLinuxBoot(void)
   /* Done with the kernel map. */
   MmUnmapIoSpace(kernel_map, 0x00080000);
 
-  /* Now that the map is built, we must get the real mode and flat
-     protected mode code into the right places.  */
-
-  /* Copy the 32-bit stub code to 0x00090000... */
-  addr.QuadPart = 0x0000000000090000ULL;
-  code_dest = MmMapIoSpace(addr, KILLPAGING_BIN_SIZE, MmNonCached);
-  RtlCopyMemory(code_dest, killpaging_bin, KILLPAGING_BIN_SIZE);
-  MmUnmapIoSpace(code_dest, KILLPAGING_BIN_SIZE);
-
-  /* ...and the real mode code to 0x00008000. */
+  /* Now that the map is built, we must get the
+     boot code into the right place.  */
   addr.QuadPart = 0x0000000000008000ULL;
   code_dest = MmMapIoSpace(addr, REALMODE_BIN_SIZE, MmNonCached);
   RtlCopyMemory(code_dest, realmode_bin, REALMODE_BIN_SIZE);
   MmUnmapIoSpace(code_dest, REALMODE_BIN_SIZE);
 
-  /* Now we must prepare to execute the 32-bit stub code.
+  /* Now we must prepare to execute the boot code.
      The most important preparation step is to identity-map the memory
      containing it - to make its physical and virtual addresses the same.
      We do this by direct manipulation of the page table.  This has to be
-     done for it to be able to safely turn off paging and return to
-     real mode.
+     done for it to be able to safely turn off paging, return to
+     real mode, and do its thing.
 
      Needless to say, here be dragons!
    */
@@ -143,7 +142,7 @@ static void DoLinuxBoot(void)
     page_directory_pointer_table = MmMapIoSpace(addr, 4096, MmNonCached);
 
     /* If the page directory isn't present, use
-       the second page below the real mode code.  */
+       the second page below the boot code.  */
     if (!(page_directory_pointer_table[0] & 0x00000001)) {
       page_directory_pointer_table[0] = 0x00006000;
       page_directory_pointer_table[1] = 0x00000000;
@@ -157,7 +156,7 @@ static void DoLinuxBoot(void)
     page_directory = MmMapIoSpace(addr, 4096, MmNonCached);
 
     /* If the page table isn't present, use
-       the next page below the real mode code.  */
+       the next page below the boot code.  */
     if (!(page_directory[0] & 0x00000001)) {
       page_directory[0] = 0x00007000;
       page_directory[1] = 0x00000000;
@@ -169,8 +168,8 @@ static void DoLinuxBoot(void)
     addr.HighPart = page_directory[1];
     addr.LowPart = page_directory[0] & 0xfffff000;
     page_table = MmMapIoSpace(addr, 4096, MmNonCached);
-    page_table[0x120] = 0x00090023;
-    page_table[0x121] = 0x00000000;
+    page_table[0x10] = 0x00008023;
+    page_table[0x11] = 0x00000000;
     MmUnmapIoSpace(page_table, 4096);
 
     MmUnmapIoSpace(page_directory, 4096);
@@ -197,17 +196,17 @@ static void DoLinuxBoot(void)
     addr.HighPart = 0x00000000;
     addr.LowPart = page_directory[0] & 0xfffff000;
     page_table = MmMapIoSpace(addr, 4096, MmNonCached);
-    page_table[0x90] = 0x00090023;
+    page_table[0x08] = 0x00008023;
     MmUnmapIoSpace(page_table, 4096);
 
     MmUnmapIoSpace(page_directory, 4096);
   }
 
   /* Flush the page from the TLB... */
-  util_invlpg(0x00090000);
+  util_invlpg(0x00008000);
 
   /* ...and away we go! */
-  ((void (*)())0x00090000)();
+  ((void (*)())0x00008000)();
 
   /* Should never happen. */
   KeBugCheckEx(0x42424242, 0x42424242, 0x42424242, 0x42424242, 0x42424242);

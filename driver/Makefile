@@ -36,7 +36,7 @@ clean :
 	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin linuxboot_blobs/*.exe linuxboot_blobs/*.o $(shell ls linuxboot_blobs/*.h | grep -v 'swapptr.h')
 .PHONY : clean
 
-linuxboot.o : linuxboot_blobs/killpaging.h linuxboot_blobs/realmode.h
+linuxboot.o : linuxboot_blobs/realmode.h
 
 linuxboot_blobs/realmode.bin : linuxboot_blobs/reassemble.bin
 
