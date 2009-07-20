@@ -43,7 +43,7 @@ _swap_page:
   mov eax, [ebp + 20]
   mov dword [0x0009180c], eax
   invlpg [0x00100000]
-  invlpg [0x00100100]
+  invlpg [0x00101000]
 
   ; Swap the pages.
   mov esi, 0x00100000
