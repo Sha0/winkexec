@@ -45,24 +45,18 @@ _swap_page:
   invlpg [0x00100000]
   invlpg [0x00100100]
 
-  ; Copy page 1 to the scratch area.
-  cld
+  ; Swap the pages.
   mov esi, 0x00100000
-  mov edi, 0x00092000
-  mov ecx, 1024
-  rep movsd
-
-  ; Copy page 2 to page 1.
-  mov esi, 0x00101000
-  mov edi, 0x00100000
-  mov ecx, 1024
-  rep movsd
-
-  ; Copy the scratch area to page 2.
-  mov esi, 0x00092000
   mov edi, 0x00101000
   mov ecx, 1024
-  rep movsd
+.swapAnotherDword:
+  mov eax, dword [esi]
+  xchg eax, dword [edi]
+  mov dword [esi], eax
+  add esi, 4
+  add edi, 4
+  dec ecx
+  jnz .swapAnotherDword
 
   ; Unmap the pages.
   mov edi, 0x00091800
