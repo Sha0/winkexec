@@ -40,17 +40,6 @@ bits 32
   ; Install the new GDT.
   lgdt [gdttag]
 
-  ; Reload the segment registers (and stack) with
-  ; 16-bit real-mode-appropriate descriptors starting
-  ; at the base of memory.
-  mov eax,0x00000020
-  mov ds,ax
-  mov es,ax
-  mov fs,ax
-  mov gs,ax
-  mov ss,ax
-  mov esp,0x00007ffe  ; Stack accessible in real mode.
-
   ; Enter 16-bit protected mode through the new GDT.
   jmp 0x0018:in16bitpmode
 in16bitpmode:
@@ -154,12 +143,10 @@ theGreatReshuffling:
 .inProtectedMode:
   bits 32
 
-  ; Fix up the rest of the segments for 32-bit protected mode.
+  ; Fix up the segments we're going to need in 32-bit protected mode.
   mov eax, 0x00000010
   mov ds, ax
   mov es, ax
-  mov fs, ax
-  mov gs, ax
   mov ss, ax
   mov esp, 0x00006ffc
 
@@ -227,15 +214,6 @@ theGreatReshuffling:
   and al, 0xdf
   mov cr4, eax
 
-  ; Load 16-bit segments for the switch back to real mode.
-  mov eax, 0x00000020
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-  mov ss, ax
-  mov esp, 0x000006ffe
-
   ; Temporarily drop to 16-bit protected mode.
   jmp 0x0018:.halfwayOutOfProtectedMode
 .halfwayOutOfProtectedMode:
@@ -250,12 +228,10 @@ theGreatReshuffling:
   jmp 0x0000:.fullyOutOfProtectedMode
 .fullyOutOfProtectedMode:
 
-  ; Load the real mode values back into the segments.
+  ; Load the real mode values back into the segments that were used.
   xor ax, ax
   mov ds, ax
   mov es, ax
-  mov fs, ax
-  mov gs, ax
 
   ; Unstash the old stack pointer and return.
   mov ax, word [old_stack_segment]
