@@ -25,6 +25,46 @@
 /* A binary blob that we are going to need -
    namely, the boot code that will finish the job for us.  */
 #include "linuxboot_blobs/realmode.h"
+/* A structure that the binary blob uses. */
+#include "linuxboot_blobs/bootinfo.h"
+
+/* Bail out of the boot process - all we can do now is BSoD... */
+static void BootPanic(PCHAR msg, DWORD code1, DWORD code2,
+  DWORD code3, DWORD code4)
+{
+  DbgPrint("kexec: *** PANIC: %s\n", msg);
+  KeBugCheckEx(0x00031337, code1, code2, code3, code4);
+}
+
+/* Stash away a pointer to a block of memory for use during boot. */
+static void WriteKernelPointer(DWORD** pd KEXEC_UNUSED,
+  DWORD** pdpos, DWORD** pt, DWORD** ptpos, PVOID virt_addr)
+{
+  PHYSICAL_ADDRESS p;
+
+  /* Allocate a new page table, if necessary. */
+  if ((!*ptpos) || (*ptpos - *pt >= 1024)) {
+    *pt = *ptpos = ExAllocatePoolWithTag(NonPagedPool,
+      4096, TAG('K', 'x', 'e', 'c'));
+    if (!*pt)
+      BootPanic("Could not allocate page table!", 0x00000002,
+        (DWORD)virt_addr, 0, 0);
+    p = MmGetPhysicalAddress(*pt);
+    *((*pdpos)++) = p.LowPart | 0x00000023;
+    *((*pdpos)++) = p.HighPart;
+  }
+
+  /* Write a 64-bit pointer into the page table.
+     (Note: said table will be used with PAE enabled.)  */
+  if (virt_addr) {
+    p = MmGetPhysicalAddress(virt_addr);
+    *((*ptpos)++) = p.LowPart | 0x00000023;  /* necessary page flags */
+    *((*ptpos)++) = p.HighPart;
+  } else {
+    *((*ptpos)++) = 0;
+    *((*ptpos)++) = 0;
+  }
+}
 
 /* By the time this is called, Windows thinks it just handed control over
    to the BIOS to reboot the computer.  As a result, nothing is really going
@@ -55,67 +95,62 @@ static void DoLinuxBoot(void)
        reassemble and boot the Linux kernel.  In this file, we refer to that
        code as the "boot code."
    */
-  DWORD* kernel_map;
-  DWORD* current_position;
   PHYSICAL_ADDRESS addr;
   PVOID code_dest;
   ULONG i;
-  int kernel_map_length;
+  DWORD* kx_page_directory;
+  DWORD* kx_pd_position;
+  DWORD* kx_page_table;
+  DWORD* kx_pt_position;
+  struct bootinfo* info_block;
 
-  /* Figure out how long the kernel map has to be. */
-  kernel_map_length  = 8 * ((KexecKernel.Size + 4095) / 4096);
-  kernel_map_length += 8;  /* for the terminator of the kernel list */
-  kernel_map_length += 8 * ((KexecInitrd.Size + 4095) / 4096);
-  kernel_map_length += 8;  /* for the terminator of the initrd list */
-  kernel_map_length += 8;  /* for the kernel command line length */
-  kernel_map_length += 8;  /* for the kernel command line */
+  /* Allocate the page directory for the kernel map. */
+  kx_page_directory = ExAllocatePoolWithTag(NonPagedPool,
+    4096, TAG('K', 'x', 'e', 'c'));
+  if (!kx_page_directory)
+    BootPanic("Could not allocate page directory!", 0x00000001, 0, 0, 0);
+  kx_pd_position = kx_page_directory;
 
-  /* Bomb if it's too long. */
-  if (kernel_map_length > 65536) {
-    DbgPrint("kexec: *** PANIC: kernel+initrd too large!\n");
-    KeBugCheckEx(0x00031337, 0x0000001, kernel_map_length, 0, 0);
-  }
+  kx_pt_position = 0;
 
-  /* Map the area of low physical memory that will hold the kernel map. */
-  addr.QuadPart = 0x0000000000010000ULL;
-  kernel_map = MmMapIoSpace(addr, 0x00080000, MmNonCached);
-  current_position = kernel_map;
+#define PAGE(a) WriteKernelPointer(&kx_page_directory, &kx_pd_position, \
+  &kx_page_table, &kx_pt_position, (a))
 
   /* Write a series of pointers to pages of the kernel,
      followed by a sentinel zero.  */
-  for (i = 0; i < KexecKernel.Size; i += 4096) {
-    PHYSICAL_ADDRESS p = MmGetPhysicalAddress(KexecKernel.Data + i);
-    *(current_position++) = p.LowPart;
-    *(current_position++) = p.HighPart;
-  }
-  *(current_position++) = 0;
-  *(current_position++) = 0;
+  for (i = 0; i < KexecKernel.Size; i += 4096)
+    PAGE(KexecKernel.Data + i);
+  PAGE(0);
 
   /* Same for the initrd. */
-  for (i = 0; i < KexecInitrd.Size; i += 4096) {
-    PHYSICAL_ADDRESS p = MmGetPhysicalAddress(KexecInitrd.Data + i);
-    *(current_position++) = p.LowPart;
-    *(current_position++) = p.HighPart;
-  }
-  *(current_position++) = 0;
-  *(current_position++) = 0;
+  for (i = 0; i < KexecInitrd.Size; i += 4096)
+    PAGE(KexecInitrd.Data + i);
+  PAGE(0);
 
-  /* Finally, write the size of the kernel command line,
-     followed by a pointer to the command line itself.  */
-  *(current_position++) = KexecKernelCommandLine.Size;
-  *(current_position++) = 0;
-  addr = MmGetPhysicalAddress(KexecKernelCommandLine.Data);
-  *(current_position++) = addr.LowPart;
-  *(current_position++) = addr.HighPart;
+  /* And finally the kernel command line.
+     (This *will* only be a single page [much less, actually!] if our new
+     kernel [not to mention the boot code!] is to not complain loudly and
+     fail, but treating it like the other two data chunks we already have
+     will make things simpler as far as the boot code goes.)  */
+  for (i = 0; i < KexecKernelCommandLine.Size; i += 4096)
+    PAGE(KexecKernelCommandLine.Data + i);
+  PAGE(0);
 
-  /* Done with the kernel map. */
-  MmUnmapIoSpace(kernel_map, 0x00080000);
-
-  /* Now that the map is built, we must get the
-     boot code into the right place.  */
+  /* Now that the paging structures are built, we must get the
+     boot code into the right place and fill in the information
+     table at the end of the first page of said code.  */
   addr.QuadPart = 0x0000000000008000ULL;
   code_dest = MmMapIoSpace(addr, REALMODE_BIN_SIZE, MmNonCached);
   RtlCopyMemory(code_dest, realmode_bin, REALMODE_BIN_SIZE);
+  info_block = (struct bootinfo*)(code_dest + 0x0fb0);
+  info_block->kernel_size = KexecKernel.Size;
+  RtlCopyMemory(info_block->kernel_hash, KexecKernel.Sha1Hash, 20);
+  info_block->initrd_size = KexecInitrd.Size;
+  RtlCopyMemory(info_block->initrd_hash, KexecInitrd.Sha1Hash, 20);
+  info_block->cmdline_size = KexecKernelCommandLine.Size;
+  RtlCopyMemory(info_block->cmdline_hash, KexecKernelCommandLine.Sha1Hash, 20);
+  addr = MmGetPhysicalAddress(kx_page_directory);
+  info_block->page_directory_ptr = addr.QuadPart | 0x0000000000000021ULL;
   MmUnmapIoSpace(code_dest, REALMODE_BIN_SIZE);
 
   /* Now we must prepare to execute the boot code.

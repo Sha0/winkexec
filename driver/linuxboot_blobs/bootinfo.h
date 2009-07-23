@@ -15,16 +15,22 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Some code to help reassemble the kernel and initrd in memory.
-   Execution of this chunk of C code will begin with the only function
-   in this file, which is _start, as we link this first into the
-   flat binary.  */
+/* The declaration for the information structure passed to the boot code. */
 
-#include "swapptr.h"
-#include "bootinfo.h"
+#ifndef BOOTINFO_H
+#define BOOTINFO_H
 
-/* The entry point.  Takes a pointer to the boot info structure.  */
-void _start(struct bootinfo* info)
-{
-  /* To be continued... */
-}
+#include <kexec.h>
+#include <stdint.h>
+
+struct bootinfo {
+  uint32_t kernel_size;
+  unsigned char kernel_hash[20];
+  uint32_t initrd_size;
+  unsigned char initrd_hash[20];
+  uint32_t cmdline_size;
+  unsigned char cmdline_hash[20];
+  uint64_t page_directory_ptr;
+} KEXEC_PACKED;
+
+#endif

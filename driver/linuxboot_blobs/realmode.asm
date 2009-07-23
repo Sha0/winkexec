@@ -134,9 +134,9 @@ display:
 theGreatReshuffling:
   ; Protected mode, here we come!
   ; Start by stashing the current stack pointer.
-  mov word [old_stack_pointer], sp
+  mov word [real_stack_pointer], sp
   mov ax, ss
-  mov word [old_stack_segment], ss
+  mov word [real_stack_segment], ss
 
   ; Our new GDT.
   lgdt [gdttag]
@@ -164,13 +164,19 @@ theGreatReshuffling:
   mov cr4, eax
 
   ; Build the page directory pointer table at 0x00007000.
-  ; The first page directory will go at 0x00090000; the rest are not present.
+  ; The first page directory will go at 0x00090000; the second is the
+  ; one we are passed from the final bit of Windows kernel API-using
+  ; code; the rest are not present.
   cld
   xor eax, eax
   mov ecx, 8
   mov edi, 0x00007000
   rep stosd
   mov dword [0x00007000], 0x00090021
+  mov eax, dword [kx_page_directory]
+  mov dword [0x00007008], eax
+  mov eax, dword [kx_page_directory+4]
+  mov dword [0x0000700c], eax
 
   ; Build the page directory at 0x00090000.
   ; We only need one page table: it will identity-map the entire first
@@ -202,13 +208,10 @@ theGreatReshuffling:
   mov cr0, eax
 
   ; Call the C code to perform the necessary page swapping.
-  ; Pass it pointers to our address variables.
-  push dword cmdline_size
-  push dword cmdline_base
-  push dword initrd_base
-  push dword kernel_base
+  ; Pass it a pointer to the boot information structure.
+  push dword bootinfo
   call c_code
-  add esp, 16
+  add esp, 4
 
   ; Turn off paging.
   mov eax, cr0
@@ -248,19 +251,15 @@ theGreatReshuffling:
   mov es, ax
 
   ; Unstash the old stack pointer and return.
-  mov ax, word [old_stack_segment]
+  mov ax, word [real_stack_segment]
   mov ss, ax
-  mov sp, word [old_stack_pointer]
+  mov sp, word [real_stack_pointer]
   ret
 
 ; Variables
 align 4
-kernel_base dd 0
-initrd_base dd 0
-cmdline_base dd 0
-cmdline_size dd 0
-old_stack_pointer dw 0
-old_stack_segment dw 0
+real_stack_pointer dw 0
+real_stack_segment dw 0
 
 ; Strings
 banner db 'WinKexec: Linux bootloader implemented as a Windows device driver',\
@@ -288,6 +287,18 @@ real_idttag:
   real_idtsize dw 0x03ff
   real_idtptr dd 0x00000000
 
+  times (4016 - ($ - $$)) db 0x00  ; pad to 4KB minus 80 bytes
+
+  ; An 80-byte structure giving the information that we need...
+  ; (Corresponds to struct bootinfo in bootinfo.h)
+bootinfo:
+  kernel_size dd 0                ; length of kernel         (0x8fb0)
+  kernel_hash times 20 db 0       ; SHA1 of kernel           (0x8fb4)
+  initrd_size dd 0                ; length of initrd         (0x8fc8)
+  initrd_hash times 20 db 0       ; SHA1 of initrd           (0x8fcc)
+  cmdline_size dd 0               ; length of cmdline        (0x8fe0)
+  cmdline_hash times 20 db 0      ; SHA1 of cmdline          (0x8fe4)
+  kx_page_directory times 8 db 0  ; PDPT entry for kernel PD (0x8ff8)
+
   ; Incorporate the C code.
-  times (0x1000 - ($ - $$)) db 0x00  ; pad to multiple of 4KB
   c_code incbin 'linuxboot_blobs/reassemble.bin'

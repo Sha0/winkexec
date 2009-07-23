@@ -36,10 +36,12 @@
 # define KEXEC_DLLIMPORT __attribute__((__dllimport__))
 # define KEXEC_DLLEXPORT __attribute__((__dllexport__))
 # define KEXEC_UNUSED __attribute__((__unused__))
+# define KEXEC_PACKED __attribute__((packed))
 #else
 # define KEXEC_DLLIMPORT __declspec(dllimport)
 # define KEXEC_DLLEXPORT __declspec(dllexport)
-# define KEXEC_UNUSED __declspec(unused)
+# define KEXEC_UNUSED
+# define KEXEC_PACKED
 #endif
 
 #endif

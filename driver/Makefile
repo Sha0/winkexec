@@ -33,7 +33,7 @@ kexec.inf : kexec.inf.in
 	$(PYTHON) ../revtag/revtag.py --tag-file .. kexec.inf.in >kexec.inf
 
 clean :
-	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin linuxboot_blobs/*.exe linuxboot_blobs/*.o $(shell ls linuxboot_blobs/*.h | grep -v 'swapptr.h')
+	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin linuxboot_blobs/*.exe linuxboot_blobs/*.o linuxboot_blobs/realmode.h
 .PHONY : clean
 
 linuxboot.o : linuxboot_blobs/realmode.h
