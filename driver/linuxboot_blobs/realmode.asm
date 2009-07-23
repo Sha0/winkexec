@@ -31,11 +31,11 @@ bits 32
   org 0x00008000
 
   ; Paging, be gone!
-  mov eax,cr0
-  and eax,0x7fffffff
-  mov cr0,eax
-  xor eax,eax
-  mov cr3,eax  ; Paging, be very gone.  (Nuke the TLB.)
+  mov eax, cr0
+  and eax, 0x7fffffff
+  mov cr0, eax
+  xor eax, eax
+  mov cr3, eax  ; Paging, be very gone.  (Nuke the TLB.)
 
   ; Install the new GDT.
   lgdt [gdttag]
@@ -45,27 +45,35 @@ bits 32
 in16bitpmode:
   bits 16
 
-  ; Drop back to real mode.
-  mov eax,cr0
-  and al,0xfe
-  mov cr0,eax
+  ; Load real-mode-appropriate segments so the descriptor
+  ; cache registers don't get royally messed up.
+  mov ax, 0x0020
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax
+  mov ss, ax
+  mov sp, 0x7ffe  ; just below this code
 
   ; Apply the real mode interrupt vector table.
   lidt [real_idttag]
 
-  ; Apply the real mode segments.
-  xor ax,ax
-  mov ds,ax
-  mov es,ax
-  mov fs,ax
-  mov gs,ax
-  mov ss,ax
-  mov sp,0x7ffe  ; just below the real mode code
+  ; Drop back to real mode.
+  mov eax, cr0
+  and al, 0xfe
+  mov cr0, eax
 
   ; Make an absolute jump below to put us in full-blown 16-bit real mode.
   jmp 0x0000:in16bitrmode
 in16bitrmode:
-  bits 16
+
+  ; Finally load the segment registers with genuine real-mode values.
+  xor ax, ax
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax
+  mov ss, ax
 
   ; Leetness! We've entered 1980s-land!  Our task now is to reassemble
   ; and boot the kernel.  Hopefully the BIOS services (at least int 0x10
@@ -218,6 +226,12 @@ theGreatReshuffling:
   jmp 0x0018:.halfwayOutOfProtectedMode
 .halfwayOutOfProtectedMode:
   bits 16
+
+  ; Fix the segment limits by loading real-mode-appropriate descriptors
+  ; into the segment registers that we have touched.
+  mov ax, 0x0020
+  mov ds, ax
+  mov es, ax
 
   ; Protected mode OFF!
   mov eax, cr0
