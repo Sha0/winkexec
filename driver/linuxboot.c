@@ -24,9 +24,9 @@
 
 /* A binary blob that we are going to need -
    namely, the boot code that will finish the job for us.  */
-#include "linuxboot_blobs/realmode.h"
+#include "boot/bootcode.h"
 /* A structure that the binary blob uses. */
-#include "linuxboot_blobs/bootinfo.h"
+#include "boot/bootinfo.h"
 
 /* Bail out of the boot process - all we can do now is BSoD... */
 static void BootPanic(PCHAR msg, DWORD code1, DWORD code2,
@@ -142,8 +142,8 @@ static void DoLinuxBoot(void)
      boot code into the right place and fill in the information
      table at the end of the first page of said code.  */
   addr.QuadPart = 0x0000000000008000ULL;
-  code_dest = MmMapIoSpace(addr, REALMODE_BIN_SIZE, MmNonCached);
-  RtlCopyMemory(code_dest, realmode_bin, REALMODE_BIN_SIZE);
+  code_dest = MmMapIoSpace(addr, BOOTCODE_BIN_SIZE, MmNonCached);
+  RtlCopyMemory(code_dest, bootcode_bin, BOOTCODE_BIN_SIZE);
   info_block = (struct bootinfo*)(code_dest + 0x0fb0);
   info_block->kernel_size = KexecKernel.Size;
   RtlCopyMemory(info_block->kernel_hash, KexecKernel.Sha1Hash, 20);
@@ -153,7 +153,7 @@ static void DoLinuxBoot(void)
   RtlCopyMemory(info_block->cmdline_hash, KexecKernelCommandLine.Sha1Hash, 20);
   addr = MmGetPhysicalAddress(kx_page_directory);
   info_block->page_directory_ptr = addr.QuadPart | 0x0000000000000021ULL;
-  MmUnmapIoSpace(code_dest, REALMODE_BIN_SIZE);
+  MmUnmapIoSpace(code_dest, BOOTCODE_BIN_SIZE);
 
   /* Now we must prepare to execute the boot code.
      The most important preparation step is to identity-map the memory

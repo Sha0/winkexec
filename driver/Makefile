@@ -21,7 +21,7 @@ CFLAGS += -I../include
 KEXEC_SYS_OBJECTS = buffer.o entry.o io.o libpe.o linuxboot.o reboot.o resource.o sha1.o util.o
 KEXEC_SYS_LIBS = -lntoskrnl -lhal
 
-LINUXBOOT_BLOBS_REASSEMBLE_EXE_OBJECTS = linuxboot_blobs/reassemble.o linuxboot_blobs/swapptr.o linuxboot_blobs/swappages.o
+BOOT_REASSEMBLE_EXE_OBJECTS = boot/reassemble.o boot/swapptr.o boot/swappages.o
 
 __main_target : kexec.sys kexec.inf
 
@@ -33,18 +33,18 @@ kexec.inf : kexec.inf.in
 	$(PYTHON) ../revtag/revtag.py --tag-file .. kexec.inf.in >kexec.inf
 
 clean :
-	-rm -f kexec.sys kexec.inf *.o linuxboot_blobs/*.bin linuxboot_blobs/*.exe linuxboot_blobs/*.o linuxboot_blobs/realmode.h
+	-rm -f kexec.sys kexec.inf *.o boot/*.bin boot/*.exe boot/*.o boot/bootcode.h
 .PHONY : clean
 
-linuxboot.o : linuxboot_blobs/realmode.h
+linuxboot.o : boot/bootcode.h
 
-linuxboot_blobs/realmode.bin : linuxboot_blobs/reassemble.bin
+boot/bootcode.bin : boot/reassemble.bin
 
-linuxboot_blobs/reassemble.bin : linuxboot_blobs/reassemble.exe
-	$(OBJCOPY) -O binary -R .idata linuxboot_blobs/reassemble.exe linuxboot_blobs/reassemble.bin
+boot/reassemble.bin : boot/reassemble.exe
+	$(OBJCOPY) -O binary -R .idata boot/reassemble.exe boot/reassemble.bin
 
-linuxboot_blobs/reassemble.exe : $(LINUXBOOT_BLOBS_REASSEMBLE_EXE_OBJECTS)
-	$(CC) $(CFLAGS) -nostdlib -Wl,--image-base,0x00009000 -o linuxboot_blobs/reassemble.exe $(LINUXBOOT_BLOBS_REASSEMBLE_EXE_OBJECTS)
+boot/reassemble.exe : $(BOOT_REASSEMBLE_EXE_OBJECTS)
+	$(CC) $(CFLAGS) -nostdlib -Wl,--image-base,0x00009000 -o boot/reassemble.exe $(BOOT_REASSEMBLE_EXE_OBJECTS)
 
 .bin.h :
 	$(PYTHON) bin2h.py $< $@ "$(shell basename $< | sed -e 's/[^a-z]/_/g')"

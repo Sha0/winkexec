@@ -302,4 +302,4 @@ bootinfo:
   kx_page_directory times 8 db 0  ; PDPT entry for kernel PD (0x8ff8)
 
   ; Incorporate the C code.
-  c_code incbin 'linuxboot_blobs/reassemble.bin'
+  c_code incbin 'boot/reassemble.bin'
