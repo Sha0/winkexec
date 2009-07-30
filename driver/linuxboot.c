@@ -136,6 +136,8 @@ static void DoLinuxBoot(void)
     PAGE(KexecKernelCommandLine.Data + i);
   PAGE(0);
 
+#undef PAGE
+
   /* Now that the paging structures are built, we must get the
      boot code into the right place and fill in the information
      table at the end of the first page of said code.  */
@@ -163,9 +165,15 @@ static void DoLinuxBoot(void)
      Needless to say, here be dragons!
    */
 
+  /* Abandon all interrupts, ye who execute here! */
+  util_cli();
+
+  /* PAE versus non-PAE means different paging structures.
+     Naturally, we will have to take that into account.
+   */
   if (util_pae_enabled()) {
-    /* We have PAE.  Stuff will be a bit different.
-       0x00090000 = directory 0, table 0, page 0x90, offset 0x000
+    /* We have PAE.
+       0x00008000 = directory 0, table 0, page 8, offset 0x000
      */
     DWORD* page_directory_pointer_table;
     DWORD* page_directory;
@@ -211,7 +219,7 @@ static void DoLinuxBoot(void)
     MmUnmapIoSpace(page_directory_pointer_table, 4096);
   } else {
     /* No PAE - it's the original x86 paging mechanism.
-       0x00090000 = table 0, page 0x90, offset 0x000
+       0x00008000 = table 0, page 8, offset 0x000
      */
     DWORD* page_directory;
     DWORD* page_table;
@@ -222,7 +230,7 @@ static void DoLinuxBoot(void)
     page_directory = MmMapIoSpace(addr, 4096, MmNonCached);
 
     /* If the page table isn't present, use
-       the next page below the real-mode code.  */
+       the next page below the boot code.  */
     if (!(page_directory[0] & 0x00000001))
       page_directory[0] = 0x00007000;
     page_directory[0] |= 0x00000023;
@@ -254,17 +262,19 @@ static VOID KexecThreadProc(PVOID Context KEXEC_UNUSED)
 {
   HANDLE hThread;
   ULONG currentProcessor;
-
-  util_cli();  /* abandon all interrupts, ye who execute here! */
-  currentProcessor = util_current_processor();
-
-  DbgPrint("KexecThreadProc() entered on processor #%d.\n", currentProcessor);
+  KIRQL irql;
 
   /* Fork-bomb all but the first processor.
      To do that, we create a thread that calls this function again.  */
   PsCreateSystemThread(&hThread, GENERIC_ALL, 0, NULL,
     NULL, (PKSTART_ROUTINE)KexecThreadProc, NULL);
   ZwClose(hThread);
+
+  /* Prevent thread switching on this processor. */
+  KeRaiseIrql(DISPATCH_LEVEL, &irql);
+
+  currentProcessor = util_current_processor();
+  DbgPrint("KexecThreadProc() entered on processor #%d.\n", currentProcessor);
 
   /* If we're the first processor, go ahead. */
   if (currentProcessor == 0)

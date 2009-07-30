@@ -235,6 +235,7 @@ theGreatReshuffling:
   mov ax, 0x0020
   mov ds, ax
   mov es, ax
+  mov ss, ax
 
   ; Protected mode OFF!
   mov eax, cr0
