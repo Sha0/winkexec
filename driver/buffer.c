@@ -92,14 +92,16 @@ NTSTATUS KexecLoadBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID data)
 }
 
 /* Retrieve data from a buffer. */
-NTSTATUS KexecGetBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID buf)
+NTSTATUS KexecGetBuffer(PKEXEC_BUFFER KexecBuffer, ULONG size, PVOID buf, DWORD* osize)
 {
   LOCK_BUFFER(KexecBuffer);
   if (size < KexecBuffer->Size) {
+    *osize = 0;
     UNLOCK_BUFFER(KexecBuffer);
     return STATUS_INSUFFICIENT_RESOURCES;
   }
   RtlCopyMemory(buf, KexecBuffer->Data, KexecBuffer->Size);
+  *osize = KexecBuffer->Size;
   UNLOCK_BUFFER(KexecBuffer);
   return STATUS_SUCCESS;
 }

@@ -16,13 +16,15 @@
  */
 
 #define IN_KEXEC_COMMON
+#undef NDEBUG
 #include <KexecCommon.h>
+#include <assert.h>
 
-/* Are we GUI? */
-BOOL isGui;
+static char kxciLastErrorMsg[256];
+
 
 /* Convenient wrapper around FormatMessage() and GetLastError() */
-KEXEC_DLLEXPORT LPSTR KexecTranslateError(void)
+static LPSTR KxciTranslateError(void)
 {
   static LPSTR msgbuf = NULL;
 
@@ -37,36 +39,132 @@ KEXEC_DLLEXPORT LPSTR KexecTranslateError(void)
   return msgbuf;
 }
 
-/* Even more convenient wrapper around the above function.
-   Use just like perror().
-   XXX: Does the Windows API have something like this already? */
-KEXEC_DLLEXPORT void KexecPerror(char * errmsg)
+
+/* Set the most recent KexecCommon-related error message. */
+static void KxciBuildErrorMessage(LPSTR errmsg)
 {
-  if (isGui)
-    MessageBoxPrintf(NULL, "%s: %s", "WinKexec GUI", MB_ICONERROR | MB_OK,
-      errmsg, KexecTranslateError());
+  snprintf(kxciLastErrorMsg, 255, "%s: %s", errmsg, KxciTranslateError());
+  kxciLastErrorMsg[255] = '\0';
+}
+
+
+/* Reset the error message. */
+static void KxciResetErrorMessage(void)
+{
+  memset(kxciLastErrorMsg, 0, 256);
+}
+
+
+/* Did an error occur? */
+KEXEC_DLLEXPORT BOOL KxcErrorOccurred(void)
+{
+  return (strlen(kxciLastErrorMsg) > 0);
+}
+
+/* Get the KexecCommon error message. */
+KEXEC_DLLEXPORT const char* KxcGetErrorMessage(void)
+{
+  if (KxcErrorOccurred())
+    return kxciLastErrorMsg;
   else
-    fprintf(stderr, "%s: %s", errmsg, KexecTranslateError());
+    return NULL;
 }
 
-/* MessageBox with printf. */
-KEXEC_DLLEXPORT void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
-  LPCSTR title, DWORD flags, ...)
+
+/* Report an error to stderr. */
+KEXEC_DLLEXPORT void KxcReportErrorStderr(void)
 {
-  char buf[256];
-  va_list args;
-
-  va_start(args, flags);
-
-  /* We can't KexecPerror() these errors or we could infinitely recurse... */
-  vsnprintf(buf, 255, fmtstr, args);
-  buf[255] = '\0';
-  MessageBox(parent, buf, title, flags);
-  va_end(args);
+  if (KxcErrorOccurred())
+    fprintf(stderr, "%s\n", kxciLastErrorMsg);
 }
+
+
+/* Report an error to stderr. */
+KEXEC_DLLEXPORT void KxcReportErrorMsgbox(void)
+{
+  if (KxcErrorOccurred())
+    MessageBox(NULL, kxciLastErrorMsg, "KexecCommon", MB_ICONERROR | MB_OK);
+}
+
+
+/* Read a file into memory. */
+KEXEC_DLLEXPORT PVOID KxcLoadFile(const char* filename, DWORD* length)
+{
+  HANDLE hFile;
+  PVOID buf;
+  DWORD filelen, readlen;
+
+  /* Open it... */
+  if ((hFile = CreateFile(filename, GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
+    KxciBuildErrorMessage("Failed to load file");
+    return NULL;
+  }
+
+  /* ...get the size... */
+  if ((filelen = GetFileSize(hFile, NULL)) == INVALID_FILE_SIZE) {
+    KxciBuildErrorMessage("Failed to get file size");
+    CloseHandle(hFile);
+    return NULL;
+  }
+
+  /* ...grab a buffer... */
+  if ((buf = malloc(filelen)) == NULL) {
+    snprintf(kxciLastErrorMsg, 255, "%s: %s", "Could not allocate buffer for file", strerror(errno));
+    kxciLastErrorMsg[255] = '\0';
+    CloseHandle(hFile);
+    return NULL;
+  }
+  /* ...read it in... */
+  if (!ReadFile(hFile, buf, filelen, &readlen, NULL)) {
+    KxciBuildErrorMessage("Could not read file");
+    CloseHandle(hFile);
+    return NULL;
+  }
+  assert(filelen == readlen);
+  /* ...and close it. */
+  CloseHandle(hFile);
+
+  *length = readlen;
+  return buf;
+}
+
+
+/* Perform a driver operation by ioctl'ing the kexec virtual device. */
+KEXEC_DLLEXPORT BOOL KxcDriverOperation(DWORD opcode, LPVOID ibuf, DWORD ibuflen, LPVOID obuf, DWORD obuflen)
+{
+  HANDLE dev;
+  DWORD foo;
+  DWORD filemode;
+
+  KxciResetErrorMessage();
+
+  if (!KxcLoadDriver())
+    return FALSE;
+
+  if ((opcode & KEXEC_OPERATION_MASK) == KEXEC_SET)
+    filemode = GENERIC_WRITE;
+  else
+    filemode = GENERIC_READ;
+
+  /* \\.\kexec is the interface to kexec.sys. */
+  if ((dev = CreateFile("\\\\.\\kexec", filemode, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
+    KxciBuildErrorMessage("Failed to open \\\\.\\kexec");
+    return FALSE;
+  }
+
+  if (!DeviceIoControl(dev, opcode, ibuf, ibuflen, obuf, obuflen, &foo, NULL)) {
+    KxciBuildErrorMessage("Driver operation failed");
+    CloseHandle(dev);
+    return FALSE;
+  }
+
+  CloseHandle(dev);
+  return TRUE;
+}
+
 
 /* Is the kexec driver loaded? */
-KEXEC_DLLEXPORT BOOL KexecDriverIsLoaded(void)
+KEXEC_DLLEXPORT BOOL KxcIsDriverLoaded(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
@@ -74,16 +172,17 @@ KEXEC_DLLEXPORT BOOL KexecDriverIsLoaded(void)
   BOOL retval;
   DWORD ExtraBytes;
 
+  KxciResetErrorMessage();
+
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
-    KexecPerror("Could not open SCM");
+    KxciBuildErrorMessage("Could not open SCM");
     exit(EXIT_FAILURE);
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
-    KexecPerror("Could not open the kexec service");
-    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
+    KxciBuildErrorMessage("Could not open the kexec service");
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
   }
@@ -91,8 +190,7 @@ KEXEC_DLLEXPORT BOOL KexecDriverIsLoaded(void)
   if (!QueryServiceStatusEx(KexecService, SC_STATUS_PROCESS_INFO, (LPBYTE)&ServiceStatus,
     sizeof(ServiceStatus), &ExtraBytes))
   {
-    KexecPerror("Could not query the kexec service");
-    fprintf(stderr, "(Are you an admin?)\n");
+    KxciBuildErrorMessage("Could not query the kexec service");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
@@ -104,89 +202,91 @@ KEXEC_DLLEXPORT BOOL KexecDriverIsLoaded(void)
   return retval;
 }
 
+
 /* Load kexec.sys into the kernel, if it isn't already. */
-KEXEC_DLLEXPORT void LoadKexecDriver(void)
+KEXEC_DLLEXPORT BOOL KxcLoadDriver(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
 
-  if (KexecDriverIsLoaded())
-    return;
+  KxciResetErrorMessage();
+
+  if (KxcIsDriverLoaded())
+    return TRUE;
 
   printf("Loading the kexec driver... ");
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
-    KexecPerror("Could not open SCM");
-    exit(EXIT_FAILURE);
+    KxciBuildErrorMessage("Could not open SCM");
+    return FALSE;
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
-    KexecPerror("Could not open the kexec service");
-    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
+    KxciBuildErrorMessage("Could not open the kexec service");
     CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
+    return FALSE;
   }
 
   /* This does not return until DriverEntry() has completed in kexec.sys. */
   if (!StartService(KexecService, 0, NULL)) {
-    KexecPerror("Could not start the kexec service");
-    fprintf(stderr, "(Are you an admin?)\n");
+    KxciBuildErrorMessage("Could not start the kexec service");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
+    return FALSE;
   }
 
   CloseServiceHandle(KexecService);
   CloseServiceHandle(Scm);
   printf("ok\n");
-  return;
+  return TRUE;
 }
 
+
 /* If kexec.sys is loaded into the kernel, unload it. */
-KEXEC_DLLEXPORT void UnloadKexecDriver(void)
+KEXEC_DLLEXPORT BOOL KxcUnloadDriver(void)
 {
   SC_HANDLE Scm;
   SC_HANDLE KexecService;
   SERVICE_STATUS ServiceStatus;
 
-  if (!KexecDriverIsLoaded())
-    return;
+  KxciResetErrorMessage();
+
+  if (!KxcIsDriverLoaded())
+    return TRUE;
 
   printf("Unloading the kexec driver... ");
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
-    KexecPerror("Could not open SCM");
-    exit(EXIT_FAILURE);
+    KxciBuildErrorMessage("Could not open SCM");
+    return FALSE;
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
-    KexecPerror("Could not open the kexec service");
-    fprintf(stderr, "(Is the kexec driver installed, and are you an admin?)\n");
+    KxciBuildErrorMessage("Could not open the kexec service");
     CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
+    return FALSE;
   }
 
   /* This does not return until DriverUnload() has completed in kexec.sys. */
   if (!ControlService(KexecService, SERVICE_CONTROL_STOP, &ServiceStatus)) {
-    KexecPerror("Could not stop the kexec service");
-    fprintf(stderr, "(Are you an admin?)\n");
+    KxciBuildErrorMessage("Could not stop the kexec service");
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
-    exit(EXIT_FAILURE);
+    return FALSE;
   }
 
   CloseServiceHandle(KexecService);
   CloseServiceHandle(Scm);
   printf("ok\n");
-  return;
+  return TRUE;
 }
 
-/* What we must know before continuing... */
-KEXEC_DLLEXPORT void KexecCommonInit(BOOL in_isGui)
+
+KEXEC_DLLEXPORT void KxcInit(void)
 {
-  isGui = in_isGui;
+  KxciResetErrorMessage();
 }

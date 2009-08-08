@@ -15,10 +15,13 @@
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 EXPORTS
-KexecTranslateError
-KexecPerror
-MessageBoxPrintf
-KexecDriverIsLoaded
-LoadKexecDriver
-UnloadKexecDriver
-KexecCommonInit
+KxcErrorOccurred
+KxcGetErrorMessage
+KxcReportErrorStderr
+KxcReportErrorMsgbox
+KxcLoadFile
+KxcDriverOperation
+KxcIsDriverLoaded
+KxcLoadDriver
+KxcUnloadDriver
+KxcInit

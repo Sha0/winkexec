@@ -29,13 +29,15 @@
 # define KEXECCOMMON_SPEC KEXEC_DLLIMPORT
 #endif
 
-KEXECCOMMON_SPEC LPSTR KexecTranslateError(void);
-KEXECCOMMON_SPEC void KexecPerror(char * errmsg);
-KEXECCOMMON_SPEC void MessageBoxPrintf(HWND parent, LPCSTR fmtstr,
-  LPCSTR title, DWORD flags, ...);
-KEXECCOMMON_SPEC BOOL KexecDriverIsLoaded(void);
-KEXECCOMMON_SPEC void LoadKexecDriver(void);
-KEXECCOMMON_SPEC void UnloadKexecDriver(void);
-KEXECCOMMON_SPEC void KexecCommonInit(BOOL in_isGui);
+KEXECCOMMON_SPEC BOOL KxcErrorOccurred(void);
+KEXECCOMMON_SPEC const char* KxcGetErrorMessage(void);
+KEXECCOMMON_SPEC void KxcReportErrorStderr(void);
+KEXECCOMMON_SPEC void KxcReportErrorMsgbox(void);
+KEXECCOMMON_SPEC PVOID KxcLoadFile(const char* filename, DWORD* length);
+KEXECCOMMON_SPEC BOOL KxcDriverOperation(DWORD opcode, LPVOID ibuf, DWORD ibuflen, LPVOID obuf, DWORD obuflen);
+KEXECCOMMON_SPEC BOOL KxcIsDriverLoaded(void);
+KEXECCOMMON_SPEC BOOL KxcLoadDriver(void);
+KEXECCOMMON_SPEC BOOL KxcUnloadDriver(void);
+KEXECCOMMON_SPEC void KxcInit(void);
 
 #endif

@@ -25,21 +25,22 @@
 
 
 /* Handle kexec /l */
-int DoLoad(int argc, char** argv)
+static int DoLoad(int argc, char** argv)
 {
-  DWORD klen, ilen, read_len;
+  DWORD klen, ilen, cmdlen;
   unsigned char* kbuf;
   unsigned char* ibuf = NULL;
   unsigned char* cmdline = NULL;
-  HANDLE kernel, initrd, device;
   int i;
-  DWORD cmdlen = 0;
 
   /* No args: just load the driver and do nothing else. */
   if (argc < 1) {
-    if (!KexecDriverIsLoaded())
-      LoadKexecDriver();
-    else
+    if (!KxcIsDriverLoaded()) {
+      if (!KxcLoadDriver()) {
+        KxcReportErrorStderr();
+        exit(EXIT_FAILURE);
+      }
+    } else
       printf("The kexec driver was already loaded; nothing to do.\n");
     exit(EXIT_SUCCESS);
   }
@@ -48,52 +49,22 @@ int DoLoad(int argc, char** argv)
 
   /* Read the kernel into a buffer. */
   printf("Reading kernel... ");
-  /* Open it... */
-  if ((kernel = CreateFile(argv[0], GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
-    KexecPerror("Failed to load kernel");
+  if (!(kbuf = KxcLoadFile(argv[0], &klen))) {
+    KxcReportErrorStderr();
     exit(EXIT_FAILURE);
   }
-
-  /* ...get the size... */
-  if ((klen = GetFileSize(kernel, NULL)) == INVALID_FILE_SIZE) {
-    KexecPerror("Failed to get kernel size");
-    CloseHandle(kernel);
-    exit(EXIT_FAILURE);
-  }
-
-  /* ...grab a buffer... */
-  if ((kbuf = malloc(klen)) == NULL) {
-    perror("Could not allocate buffer for kernel");
-    CloseHandle(kernel);
-    exit(EXIT_FAILURE);
-  }
-  /* ...read it in... */
-  if (!ReadFile(kernel, kbuf, klen, &read_len, NULL)) {
-    KexecPerror("Could not read kernel");
-    CloseHandle(kernel);
-    exit(EXIT_FAILURE);
-  }
-  /* ...and close it. */
-  CloseHandle(kernel);
   printf("ok\n");
-
-  /* Make sure we got all of it. */
-  if (klen != read_len) {
-    fprintf(stderr, "internal error: buffer length mismatch!\n");
-    fprintf(stderr, "(" __FILE__ ":%d)\n", __LINE__);
-    fprintf(stderr, "please report this to Stump!\n");
-    exit(EXIT_FAILURE);
-  }
 
   /* Magic numbers in a Linux kernel image */
   if (*(unsigned short*)(kbuf+510) != 0xaa55 ||
     strncmp(kbuf+514, "HdrS", 4) != 0)
   {
-      fprintf(stderr, "warning: This does not look like a Linux kernel.\n");
-      fprintf(stderr, "warning: Loading it anyway.\n");
+    fprintf(stderr, "warning: This does not look like a Linux kernel.\n");
+    fprintf(stderr, "warning: Loading it anyway.\n");
   }
 
   /* Look for an initrd. */
+  ilen = cmdlen = 0;
   for (i = 1; i < argc; i++) {
     /* While we're parsing the cmdline, also tally up how much RAM we need
        to hold the final cmdline we send to kexec.sys. */
@@ -103,42 +74,11 @@ int DoLoad(int argc, char** argv)
 
       /* Read the initrd into a buffer. */
       printf("Reading initrd... ");
-      /* Open it... */
-      if ((initrd = CreateFile(argv[i]+7, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
-        KexecPerror("Failed to load initrd");
+      if (!(ibuf = KxcLoadFile(argv[i]+7, &ilen))) {
+        KxcReportErrorStderr();
         exit(EXIT_FAILURE);
       }
-
-      /* ...get the size... */
-      if ((ilen = GetFileSize(initrd, NULL)) == INVALID_FILE_SIZE) {
-        KexecPerror("Failed to get initrd size");
-        CloseHandle(initrd);
-        exit(EXIT_FAILURE);
-      }
-
-      /* ...grab a buffer... */
-      if ((ibuf = malloc(ilen)) == NULL) {
-        perror("Could not allocate buffer for initrd");
-        CloseHandle(initrd);
-        exit(EXIT_FAILURE);
-      }
-      /* ...read it in... */
-      if (!ReadFile(initrd, ibuf, ilen, &read_len, NULL)) {
-        KexecPerror("Could not read initrd");
-        CloseHandle(initrd);
-        exit(EXIT_FAILURE);
-      }
-      /* ...and close it. */
-      CloseHandle(initrd);
       printf("ok\n");
-
-      /* Make sure we got all of it. */
-      if (ilen != read_len) {
-        fprintf(stderr, "internal error: buffer length mismatch!\n");
-        fprintf(stderr, "(" __FILE__ ":%d in revision %d)\n", __LINE__, SVN_REVISION);
-        fprintf(stderr, "please report this to Stump!\n");
-        exit(EXIT_FAILURE);
-      }
     }
   }
 
@@ -160,19 +100,10 @@ int DoLoad(int argc, char** argv)
   }
 
   /* Now let kexec.sys know about it. */
-  LoadKexecDriver();
-  /* \\.\kexec is the interface to kexec.sys. */
-  if ((device = CreateFile("\\\\.\\kexec", 0, 0, NULL, OPEN_EXISTING, 0, NULL)) == INVALID_HANDLE_VALUE) {
-    KexecPerror("Failed to open \\\\.\\kexec");
-    fprintf(stderr, "(Are you an admin?)\n");
-    exit(EXIT_FAILURE);
-  }
-
   /* Do the kernel... */
   printf("Loading kernel into kexec driver... ");
-  if (!DeviceIoControl(device, KEXEC_SET | KEXEC_KERNEL, kbuf, klen, NULL, 0, &read_len, NULL)) {
-    KexecPerror("Could not load kernel into driver");
-    CloseHandle(device);
+  if (!KxcDriverOperation(KEXEC_SET | KEXEC_KERNEL, kbuf, klen, NULL, 0)) {
+    KxcReportErrorStderr();
     exit(EXIT_FAILURE);
   }
   free(kbuf);
@@ -181,52 +112,90 @@ int DoLoad(int argc, char** argv)
   /* ...and the initrd. */
   if (ibuf) {
     printf("Loading initrd into kexec driver... ");
-    if (!DeviceIoControl(device, KEXEC_SET | KEXEC_INITRD, ibuf, ilen, NULL, 0, &read_len, NULL)) {
-      KexecPerror("Could not load initrd into driver");
-      CloseHandle(device);
+    if (!KxcDriverOperation(KEXEC_SET | KEXEC_INITRD, ibuf, ilen, NULL, 0)) {
+      KxcReportErrorStderr();
       exit(EXIT_FAILURE);
     }
     free(ibuf);
     printf("ok\n");
   } else {
-    if (!DeviceIoControl(device, KEXEC_SET | KEXEC_INITRD, NULL, 0, NULL, 0, &read_len, NULL)) {
-      KexecPerror("Could not unload initrd from driver");
-      CloseHandle(device);
+    printf("Setting null initrd... ");
+    if (!KxcDriverOperation(KEXEC_SET | KEXEC_INITRD, NULL, 0, NULL, 0)) {
+      KxcReportErrorStderr();
       exit(EXIT_FAILURE);
     }
+    printf("ok\n");
   }
 
   printf("Setting kernel command line... ");
-  if (!DeviceIoControl(device, KEXEC_SET | KEXEC_KERNEL_COMMAND_LINE, cmdline, cmdlen, NULL, 0, &read_len, NULL)) {
-    KexecPerror("Could not set kernel command line");
-    CloseHandle(device);
+  if (!KxcDriverOperation(KEXEC_SET | KEXEC_KERNEL_COMMAND_LINE, cmdline, cmdlen, NULL, 0)) {
+    KxcReportErrorStderr();
     exit(EXIT_FAILURE);
   }
   if (cmdline)
     free(cmdline);
   printf("ok\n");
 
-  /* And we're done! */
-  CloseHandle(device);
-
   exit(EXIT_SUCCESS);
 }
 
+
 /* Handle kexec /u */
-int DoUnload(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
+static int DoUnload(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
 {
-  if (KexecDriverIsLoaded())
-    UnloadKexecDriver();
-  else
+  if (KxcIsDriverLoaded()) {
+    if (!KxcUnloadDriver()) {
+      KxcReportErrorStderr();
+      exit(EXIT_FAILURE);
+    }
+  } else
     printf("The kexec driver was not loaded; nothing to do.\n");
   exit(EXIT_SUCCESS);
 }
 
-/* Handle kexec /s */
-int DoShow(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
+
+/* Handle kexec /c */
+static int DoClear(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
 {
+  /* We can't do it without kexec.sys loaded... */
+  if (!KxcIsDriverLoaded()) {
+    printf("The kexec driver is not loaded.\n");
+    exit(EXIT_FAILURE);
+  }
+
+  printf("Setting null kernel... ");
+  if (!KxcDriverOperation(KEXEC_SET | KEXEC_KERNEL, NULL, 0, NULL, 0)) {
+    KxcReportErrorStderr();
+    exit(EXIT_FAILURE);
+  }
+  printf("ok\n");
+
+  printf("Setting null initrd... ");
+  if (!KxcDriverOperation(KEXEC_SET | KEXEC_INITRD, NULL, 0, NULL, 0)) {
+    KxcReportErrorStderr();
+    exit(EXIT_FAILURE);
+  }
+  printf("ok\n");
+
+  printf("Setting null kernel command line... ");
+  if (!KxcDriverOperation(KEXEC_SET | KEXEC_KERNEL_COMMAND_LINE, NULL, 0, NULL, 0)) {
+    KxcReportErrorStderr();
+    exit(EXIT_FAILURE);
+  }
+  printf("ok\n");
+
+  exit(EXIT_SUCCESS);
+}
+
+
+/* Handle kexec /s */
+static int DoShow(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
+{
+  DWORD bytecount;
+  unsigned char* cmdline;
+
   /* kexec.sys can't tell us anything if it's not loaded... */
-  if (!KexecDriverIsLoaded()) {
+  if (!KxcIsDriverLoaded()) {
     printf("The kexec driver is not loaded.  (Use `kexec /l' to load it.)\n");
     exit(EXIT_FAILURE);
   }
@@ -234,12 +203,59 @@ int DoShow(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
   /* Well, we know this much. */
   printf("The kexec driver is active.  (Use `kexec /u' to unload it.)\n");
 
-  /* XXX: Actually show runtime state! */
+  /* Check the loaded kernel. */
+  if (!KxcDriverOperation(KEXEC_GET_SIZE | KEXEC_KERNEL, NULL, 0, &bytecount, sizeof(DWORD))) {
+    fprintf(stderr, "getting kernel size: ");
+    KxcReportErrorStderr();
+    exit(EXIT_FAILURE);
+  }
+  if (bytecount > 0)
+    printf("Kernel size: %lu bytes\n", bytecount);
+  else {
+    printf("No kernel is loaded.\n");
+    exit(EXIT_SUCCESS);  /* no point in continuing... */
+  }
+
+  /* Check the loaded initrd. */
+  if (!KxcDriverOperation(KEXEC_GET_SIZE | KEXEC_INITRD, NULL, 0, &bytecount, sizeof(DWORD))) {
+    fprintf(stderr, "getting initrd size: ");
+    KxcReportErrorStderr();
+    exit(EXIT_FAILURE);
+  }
+  if (bytecount > 0)
+    printf("Initrd size: %lu bytes\n", bytecount);
+  else
+    printf("No initrd is loaded.\n");  
+
+  /* Check the loaded kernel command line. */
+  if (!KxcDriverOperation(KEXEC_GET_SIZE | KEXEC_KERNEL_COMMAND_LINE, NULL, 0, &bytecount, sizeof(DWORD))) {
+    fprintf(stderr, "getting kernel command line size: ");
+    KxcReportErrorStderr();
+    exit(EXIT_FAILURE);
+  }
+  if (bytecount > 0) {
+    if (!(cmdline = malloc(bytecount + 1))) {
+      perror("malloc failure");
+      exit(EXIT_FAILURE);
+    }
+    if (!KxcDriverOperation(KEXEC_GET | KEXEC_KERNEL_COMMAND_LINE, NULL, 0, cmdline, bytecount)) {
+      fprintf(stderr, "getting kernel command line: ");
+      KxcReportErrorStderr();
+      exit(EXIT_FAILURE);
+    }
+    cmdline[bytecount] = '\0';
+    printf("Kernel command line: %s\n", cmdline);
+    free(cmdline);
+  } else
+    printf("No kernel command line is set.\n");
+  
+
   exit(EXIT_SUCCESS);
 }
 
+
 /* Show help on cmdline usage of kexec. */
-void usage()
+static void usage()
 {
   fprintf(stderr, "%s",
 "\n\
@@ -269,6 +285,7 @@ Actions:\n\
   exit(EXIT_FAILURE);
 }
 
+
 /* Entry point */
 int main(int argc, char** argv)
 {
@@ -278,13 +295,14 @@ int main(int argc, char** argv)
   if (argc < 2)
     usage();
 
-  /* Tell KexecCommon.dll that we're not GUI. */
-  KexecCommonInit(FALSE);
+  KxcInit();
 
-  /* Allow Unix-style cmdline options.
-     XXX: Add GNU-style too! */
-  if (argv[1][0] == '-')
+  /* Allow Unix-style cmdline options. */
+  if (argv[1][0] == '-') {
+    if (argv[1][1] == '-')
+      argv[1]++;
     argv[1][0] = '/';
+  }
 
   /* Decide what to do... */
   if (!strcasecmp(argv[1], "/l") || !strcasecmp(argv[1], "/load"))
@@ -292,6 +310,9 @@ int main(int argc, char** argv)
 
   if (!strcasecmp(argv[1], "/u") || !strcasecmp(argv[1], "/unload"))
     action = DoUnload;
+
+  if (!strcasecmp(argv[1], "/c") || !strcasecmp(argv[1], "/clear"))
+    action = DoClear;
 
   if (!strcasecmp(argv[1], "/s") || !strcasecmp(argv[1], "/show"))
     action = DoShow;

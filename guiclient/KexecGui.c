@@ -23,24 +23,25 @@
 
 #include "resource.h"
 
-HINSTANCE hInst;
+static HINSTANCE hInst;
 
-void KexecThisProgramIsAStump(void)
+static void KxgThisProgramIsAStump(void)
 {
   /* Kyle is awesome. */
   MessageBox(NULL, "This program is a stump.  You can help by expanding it.",
     "WinKexec GUI", MB_ICONERROR | MB_OK);
 }
 
+
 /* The processing routine for the main dialog. */
-BOOL CALLBACK KexecGuiMainDlgProc(HWND hDlg, UINT msg,
+static BOOL CALLBACK KxgMainDlgProc(HWND hDlg, UINT msg,
   WPARAM wParam, LPARAM lParam)
 {
   HANDLE bigIcon, smallIcon;
 
   switch (msg) {
     case WM_INITDIALOG:
-      KexecThisProgramIsAStump();
+      KxgThisProgramIsAStump();
 
       bigIcon = LoadImage(hInst, MAKEINTRESOURCE(KEXEC_GUI_ICON),
         IMAGE_ICON, GetSystemMetrics(SM_CXICON),
@@ -65,6 +66,7 @@ BOOL CALLBACK KexecGuiMainDlgProc(HWND hDlg, UINT msg,
   return TRUE;
 }
 
+
 /* The entry point. */
 int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev KEXEC_UNUSED,
   LPSTR cmdline KEXEC_UNUSED, int winstyle KEXEC_UNUSED)
@@ -74,14 +76,13 @@ int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev KEXEC_UNUSED,
   MSG msg;
   DWORD status;
 
-  /* Tell KexecCommon.dll that we're GUI. */
-  KexecCommonInit(TRUE);
+  KxcInit();
 
-  /* Go XP style. */
+  /* Use styled widgets if on XP or later. */
   initComCtlEx.dwSize = sizeof(INITCOMMONCONTROLSEX);
   initComCtlEx.dwICC = ICC_COOL_CLASSES;
   if (!InitCommonControlsEx(&initComCtlEx)) {
-    KexecPerror("InitCommonControlsEx");
+    MessageBox(NULL, "InitCommonControlsEx failed!", "KexecGui", MB_ICONERROR | MB_OK);
     exit(EXIT_FAILURE);
   }
 
@@ -90,9 +91,9 @@ int WINAPI WinMain(HINSTANCE in_hInst, HINSTANCE prev KEXEC_UNUSED,
 
   /* Load the main window. */
   hDlg = CreateDialog(hInst, MAKEINTRESOURCE(KEXEC_GUI_MAIN_DLG),
-    0, KexecGuiMainDlgProc);
+    0, KxgMainDlgProc);
   if (!hDlg) {
-    KexecPerror("CreateDialog");
+    MessageBox(NULL, "CreateDialog failed!", "KexecGui", MB_ICONERROR | MB_OK);
     exit(EXIT_FAILURE);
   }
 

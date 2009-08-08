@@ -45,6 +45,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject KEXEC_UNUSED, PIRP Irp)
   PIO_STACK_LOCATION IrpStack = IoGetCurrentIrpStackLocation(Irp);
   NTSTATUS status;
   ULONG IoctlCode;
+  DWORD info;
   PKEXEC_BUFFER buf;
 
   status = STATUS_SUCCESS;
@@ -52,7 +53,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject KEXEC_UNUSED, PIRP Irp)
   IoctlCode = IrpStack->Parameters.DeviceIoControl.IoControlCode;
 
   /* Select the buffer we are operating on. */
-  switch (IoctlCode & ~KEXEC_OPERATION_MASK) {
+  switch (IoctlCode & KEXEC_BUFFER_MASK) {
     case KEXEC_KERNEL:
       buf = &KexecKernel;
       break;
@@ -64,6 +65,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject KEXEC_UNUSED, PIRP Irp)
       break;
     default:
       status = STATUS_INVALID_PARAMETER;
+      info = 0;
       goto end;
   }
   /* Perform the requested operation. */
@@ -72,14 +74,22 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject KEXEC_UNUSED, PIRP Irp)
       status = KexecLoadBuffer(buf,
         IrpStack->Parameters.DeviceIoControl.InputBufferLength,
         Irp->AssociatedIrp.SystemBuffer);
+      info = 0;
       break;
     case KEXEC_GET:
       status = KexecGetBuffer(buf,
         IrpStack->Parameters.DeviceIoControl.OutputBufferLength,
-        Irp->AssociatedIrp.SystemBuffer);
+        Irp->AssociatedIrp.SystemBuffer, &info);
       break;
     case KEXEC_GET_SIZE:
-      status = KexecGetBufferSize(buf);
+      if (IrpStack->Parameters.DeviceIoControl.OutputBufferLength != sizeof(DWORD)) {
+        status = STATUS_INVALID_PARAMETER;
+        info = 0;
+      } else {
+        *(DWORD*)(Irp->AssociatedIrp.SystemBuffer) = KexecGetBufferSize(buf);
+        status = STATUS_SUCCESS;
+        info = sizeof(DWORD);
+      }
       break;
     default:
       status = STATUS_INVALID_PARAMETER;
@@ -89,7 +99,7 @@ NTSTATUS DDKAPI KexecIoctl(PDEVICE_OBJECT DeviceObject KEXEC_UNUSED, PIRP Irp)
   /* Return the results. */
 end:
   Irp->IoStatus.Status = status;
-  Irp->IoStatus.Information = 0;
+  Irp->IoStatus.Information = info;
   IoCompleteRequest(Irp, IO_NO_INCREMENT);
   return status;
 }

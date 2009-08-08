@@ -18,18 +18,26 @@
 #ifndef KEXEC_H
 #define KEXEC_H
 
+#ifdef DRIVER
+#include <ddk/ntddk.h>
+#else
+#include <windows.h>
+#include <winioctl.h>
+#endif
+
 /* Buffers to operate on */
-#define KEXEC_KERNEL 0
-#define KEXEC_INITRD 4
-#define KEXEC_KERNEL_COMMAND_LINE 8
+#define KEXEC_KERNEL CTL_CODE(0, 0x000, 0, 0)
+#define KEXEC_INITRD CTL_CODE(0, 0x004, 0, 0)
+#define KEXEC_KERNEL_COMMAND_LINE CTL_CODE(0, 0x008, 0, 0)
 
 /* Operations */
-#define KEXEC_SET 1
-#define KEXEC_GET_SIZE 2
-#define KEXEC_GET 3
+#define KEXEC_SET CTL_CODE(FILE_DEVICE_UNKNOWN, 0x801, METHOD_BUFFERED, FILE_WRITE_DATA)
+#define KEXEC_GET_SIZE CTL_CODE(FILE_DEVICE_UNKNOWN, 0x802, METHOD_BUFFERED, FILE_READ_DATA)
+#define KEXEC_GET CTL_CODE(FILE_DEVICE_UNKNOWN, 0x803, METHOD_BUFFERED, FILE_READ_DATA)
 
 /* Conveniently mask off either part of the ioctl code */
-#define KEXEC_OPERATION_MASK 0x00000003
+#define KEXEC_BUFFER_MASK CTL_CODE(0, 0x00c, 0, 0)
+#define KEXEC_OPERATION_MASK (~KEXEC_BUFFER_MASK)
 
 /* Convenience macros */
 #ifdef __GNUC__
