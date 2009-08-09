@@ -103,14 +103,18 @@ in16bitrmode:
   call theGreatReshuffling
 
   ; This code is a stump.  You can help by expanding it.
-  cli
-  hlt
+  jmp short cliHlt
 
 noPAE:
   mov si, noPAEmsg
   call display
+  ; fall through to cliHlt
+
+cliHlt:
   cli
+.hltloop:
   hlt
+  jmp short .hltloop
 
   ; Display a message on the screen.
   ; Message is at ds:si.
@@ -172,7 +176,7 @@ theGreatReshuffling:
   mov ecx, 8
   mov edi, 0x00007000
   rep stosd
-  mov dword [0x00007000], 0x00090021
+  mov dword [0x00007000], 0x00090001
   mov eax, dword [kx_page_directory]
   mov dword [0x00007008], eax
   mov eax, dword [kx_page_directory+4]

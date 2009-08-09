@@ -152,7 +152,7 @@ static void DoLinuxBoot(void)
   info_block->cmdline_size = KexecKernelCommandLine.Size;
   RtlCopyMemory(info_block->cmdline_hash, KexecKernelCommandLine.Sha1Hash, 20);
   addr = MmGetPhysicalAddress(kx_page_directory);
-  info_block->page_directory_ptr = addr.QuadPart | 0x0000000000000021ULL;
+  info_block->page_directory_ptr = addr.QuadPart | 0x0000000000000001ULL;
   MmUnmapIoSpace(code_dest, BOOTCODE_BIN_SIZE);
 
   /* Now we must prepare to execute the boot code.
@@ -190,7 +190,7 @@ static void DoLinuxBoot(void)
       page_directory_pointer_table[0] = 0x00006000;
       page_directory_pointer_table[1] = 0x00000000;
     }
-    page_directory_pointer_table[0] |= 0x00000021;
+    page_directory_pointer_table[0] |= 0x00000001;
     page_directory_pointer_table[1] &= 0x7fffffff;
 
     /* Where is the page directory? */
