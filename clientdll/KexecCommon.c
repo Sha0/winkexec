@@ -80,10 +80,10 @@ KEXEC_DLLEXPORT void KxcReportErrorStderr(void)
 
 
 /* Report an error to stderr. */
-KEXEC_DLLEXPORT void KxcReportErrorMsgbox(void)
+KEXEC_DLLEXPORT void KxcReportErrorMsgbox(HWND parent)
 {
   if (KxcErrorOccurred())
-    MessageBox(NULL, kxciLastErrorMsg, "KexecCommon", MB_ICONERROR | MB_OK);
+    MessageBox(parent, kxciLastErrorMsg, "KexecCommon", MB_ICONERROR | MB_OK);
 }
 
 
@@ -138,9 +138,6 @@ KEXEC_DLLEXPORT BOOL KxcDriverOperation(DWORD opcode, LPVOID ibuf, DWORD ibuflen
 
   KxciResetErrorMessage();
 
-  if (!KxcLoadDriver())
-    return FALSE;
-
   if ((opcode & KEXEC_OPERATION_MASK) == KEXEC_SET)
     filemode = GENERIC_WRITE;
   else
@@ -177,12 +174,14 @@ KEXEC_DLLEXPORT BOOL KxcIsDriverLoaded(void)
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
     KxciBuildErrorMessage("Could not open SCM");
+    KxcReportErrorMsgbox(NULL);
     exit(EXIT_FAILURE);
   }
 
   KexecService = OpenService(Scm, "kexec", SERVICE_ALL_ACCESS);
   if (!KexecService) {
     KxciBuildErrorMessage("Could not open the kexec service");
+    KxcReportErrorMsgbox(NULL);
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
   }
@@ -191,6 +190,7 @@ KEXEC_DLLEXPORT BOOL KxcIsDriverLoaded(void)
     sizeof(ServiceStatus), &ExtraBytes))
   {
     KxciBuildErrorMessage("Could not query the kexec service");
+    KxcReportErrorMsgbox(NULL);
     CloseServiceHandle(KexecService);
     CloseServiceHandle(Scm);
     exit(EXIT_FAILURE);
@@ -213,8 +213,6 @@ KEXEC_DLLEXPORT BOOL KxcLoadDriver(void)
 
   if (KxcIsDriverLoaded())
     return TRUE;
-
-  printf("Loading the kexec driver... ");
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
@@ -239,7 +237,6 @@ KEXEC_DLLEXPORT BOOL KxcLoadDriver(void)
 
   CloseServiceHandle(KexecService);
   CloseServiceHandle(Scm);
-  printf("ok\n");
   return TRUE;
 }
 
@@ -255,8 +252,6 @@ KEXEC_DLLEXPORT BOOL KxcUnloadDriver(void)
 
   if (!KxcIsDriverLoaded())
     return TRUE;
-
-  printf("Unloading the kexec driver... ");
 
   Scm = OpenSCManager(NULL, NULL, SC_MANAGER_ALL_ACCESS);
   if (!Scm) {
@@ -281,7 +276,6 @@ KEXEC_DLLEXPORT BOOL KxcUnloadDriver(void)
 
   CloseServiceHandle(KexecService);
   CloseServiceHandle(Scm);
-  printf("ok\n");
   return TRUE;
 }
 

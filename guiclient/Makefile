@@ -19,7 +19,7 @@ include ../common.mk
 CFLAGS += -I../include
 
 KEXEC_GUI_OBJECTS = KexecGui.o resource.o
-KEXEC_GUI_LIBS    = ../clientdll/KexecCommon.lib -lkernel32 -lmsvcrt -luser32 -lcomctl32
+KEXEC_GUI_LIBS    = ../clientdll/KexecCommon.lib -lkernel32 -lmsvcrt -luser32 -lcomctl32 -lcomdlg32
 
 __main_target : KexecGui.exe
 

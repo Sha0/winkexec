@@ -52,15 +52,58 @@ BEGIN
   END
 END
 
-CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST "manifest.xml"
+CREATEPROCESS_MANIFEST_RESOURCE_ID RT_MANIFEST 
+BEGIN
+  "<?xml version=""1.0"" encoding=""UTF-8"" standalone=""yes""?>\r\n"
+  "<assembly xmlns=""urn:schemas-microsoft-com:asm.v1"" manifestVersion=""1.0"">\r\n"
+  " <assemblyIdentity type=""win32"" name=""Stump.Kexec.KexecGui""\r\n"
+  "  version=""1.0.0." SVN_REVISION_STR """ processorArchitecture=""x86"" />\r\n"
+  " <description>Kexec for Windows GUI</description>\r\n"
 
-KEXEC_GUI_ICON ICON "../icon/Icon.ico"
+  /* This part triggers styled widgets on XP or later. */
+  " <dependency>\r\n"
+  "  <dependentAssembly>\r\n"
+  "   <assemblyIdentity type=""win32"" name=""Microsoft.Windows.Common-Controls""\r\n"
+  "    version=""6.0.0.0"" processorArchitecture=""x86""\r\n"
+  "    publicKeyToken=""6595b64144ccf1df"" language=""*"" />\r\n"
+  "  </dependentAssembly>\r\n"
+  " </dependency>\r\n"
 
-KEXEC_GUI_MAIN_DLG DIALOGEX 0, 0, 239, 63
- STYLE WS_OVERLAPPED | WS_POPUP | WS_CAPTION | DS_FIXEDSYS |
-   WS_SYSMENU | DS_CENTER | WS_MINIMIZEBOX | WS_VISIBLE
+  /* This part triggers UAC on Vista. */
+  " <trustInfo xmlns=""urn:schemas-microsoft-com:asm.v3"">\r\n"
+  "  <security>\r\n"
+  "   <requestedPrivileges>\r\n"
+  "    <requestedExecutionLevel level=""requireAdministrator"" uiAccess=""false"" />\r\n"
+  "   </requestedPrivileges>\r\n"
+  "  </security>\r\n"
+  " </trustInfo>\r\n"
+  "</assembly>\r\n"
+END
+
+KXG_ICON ICON "../icon/Icon.ico"
+
+KXG_MAIN_DLG DIALOGEX 0, 0, 232, 100
+ STYLE WS_OVERLAPPED | WS_POPUP | WS_CAPTION | WS_SYSMENU |
+   DS_CENTER | WS_MINIMIZEBOX | WS_VISIBLE
  CAPTION "WinKexec GUI"
  FONT 8, "MS Shell Dlg", 0, 0, 1
 BEGIN
- DEFPUSHBUTTON "OK", IDOK, 130, 10, 50, 14
+  DEFPUSHBUTTON "Apply", IDOK, 121, 79, 50, 14
+  PUSHBUTTON "Close", IDCANCEL, 175, 79, 50, 14
+
+  AUTOCHECKBOX "Kernel:", KXG_ID_KERNEL_SWITCH, 7, 10, 62, 10
+  LTEXT "Command line:", 1000, 19, 28, 50, 10
+  AUTOCHECKBOX "Initrd:", KXG_ID_INITRD_SWITCH, 7, 46, 62, 10, WS_DISABLED
+
+  EDITTEXT KXG_ID_KERNEL_FILENAME, 72, 7, 100, 14, WS_DISABLED | ES_AUTOHSCROLL
+  EDITTEXT KXG_ID_KERNEL_COMMAND_LINE, 72, 25, 153, 14, WS_DISABLED | ES_AUTOHSCROLL
+  EDITTEXT KXG_ID_INITRD_FILENAME, 72, 43, 100, 14, WS_DISABLED | ES_AUTOHSCROLL
+
+  PUSHBUTTON "Browse...", KXG_ID_KERNEL_BROWSE, 175, 7, 50, 14, WS_DISABLED
+  PUSHBUTTON "Browse...", KXG_ID_INITRD_BROWSE, 175, 43, 50, 14, WS_DISABLED
+
+  PUSHBUTTON "", KXG_ID_CONTROL_DRIVER, 7, 79, 65, 14
+
+  LTEXT "", KXG_ID_STATUS_TEXT, 7, 67, 218, 10
+
 END

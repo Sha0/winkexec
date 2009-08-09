@@ -36,10 +36,12 @@ static int DoLoad(int argc, char** argv)
   /* No args: just load the driver and do nothing else. */
   if (argc < 1) {
     if (!KxcIsDriverLoaded()) {
+      printf("Loading the kexec driver... ");
       if (!KxcLoadDriver()) {
         KxcReportErrorStderr();
         exit(EXIT_FAILURE);
       }
+      printf("ok\n");
     } else
       printf("The kexec driver was already loaded; nothing to do.\n");
     exit(EXIT_SUCCESS);
@@ -100,6 +102,15 @@ static int DoLoad(int argc, char** argv)
   }
 
   /* Now let kexec.sys know about it. */
+  if (!KxcIsDriverLoaded()) {
+    printf("Loading the kexec driver... ");
+    if (!KxcLoadDriver()) {
+      KxcReportErrorStderr();
+      exit(EXIT_FAILURE);
+    }
+    printf("ok\n");
+  }
+
   /* Do the kernel... */
   printf("Loading kernel into kexec driver... ");
   if (!KxcDriverOperation(KEXEC_SET | KEXEC_KERNEL, kbuf, klen, NULL, 0)) {
@@ -144,10 +155,12 @@ static int DoLoad(int argc, char** argv)
 static int DoUnload(int argc KEXEC_UNUSED, char** argv KEXEC_UNUSED)
 {
   if (KxcIsDriverLoaded()) {
+    printf("Unloading the kexec driver... ");
     if (!KxcUnloadDriver()) {
       KxcReportErrorStderr();
       exit(EXIT_FAILURE);
     }
+    printf("ok\n");
   } else
     printf("The kexec driver was not loaded; nothing to do.\n");
   exit(EXIT_SUCCESS);
