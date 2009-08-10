@@ -14,8 +14,6 @@
 ; You should have received a copy of the GNU General Public License
 ; along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-bits 32
-
 ; This gets compiled into the data segment of kexec.sys as a flat binary.
 ; kexec.sys will load this to physical address 0x00008000, identity-map
 ; that piece of RAM, and finally jump to it so we can turn off paging,
@@ -23,61 +21,72 @@ bits 32
 ; use that to reassemble the kernel and initrd, and finally boot the kernel.
 
 ; Where is stuff at the moment?
-; 0x00008000 = this code
-; 0x00010000 = kernel map
-; somewhere further up    = Windows
-; somewhere else up there = the kernel and initrd we're going to load
+; 0x00008000               = this code
+; in the struct at the end = pointer to page directory showing us
+;                            where the kernel and initrd are
+; somewhere further up     = Windows
+; somewhere else up there  = the kernel and initrd we're going to load
 
   org 0x00008000
 
-  ; Paging, be gone!
-  mov eax, cr0
-  and eax, 0x7fffffff
-  mov cr0, eax
-  xor eax, eax
-  mov cr3, eax  ; Paging, be very gone.  (Nuke the TLB.)
+_start:
+  bits 32
 
-  ; Install the new GDT.
-  lgdt [gdttag]
+  ; Initialize the real mode stack; it will begin at 0x0000:0x5ffe.
+  ; This leaves a gap of two pages (8 KB) below this code so we can
+  ; put the identity-mapping page directory and page table there.
+  mov word [real_stack_segment], 0x0000
+  mov word [real_stack_pointer], 0x5ffe
 
-  ; Enter 16-bit protected mode through the new GDT.
-  jmp 0x0018:in16bitpmode
-in16bitpmode:
+  ; Leave protected mode.  When we return, the stack we set up above
+  ; will be in effect.
+  call protToReal
   bits 16
 
-  ; Load real-mode-appropriate segments so the descriptor
-  ; cache registers don't get royally messed up.
-  mov ax, 0x0020
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-  mov ss, ax
-  mov sp, 0x7ffe  ; just below this code
+  ; Initialize the protected mode stack; it will begin at 0x000057fc.
+  ; This leaves 2 KB for the real mode stack, just in case the BIOS is
+  ; overly greedy with regard to stack space.  This stack will go into
+  ; effect when realToProt is called.
+  mov word [prot_stack_segment], 0x0010
+  mov dword [prot_stack_pointer], 0x000057fc
 
-  ; Apply the real mode interrupt vector table.
-  lidt [real_idttag]
+  ; Populate the page directory pointer table embedded within us.
+  ; (Really, that just means copying kx_page_directory to its second
+  ; entry, effectively mapping the kernel and initrd to 0x40000000.)
+  ; The first page directory will go at 0x00006000 and is already filled
+  ; in for us; the second is the one we are passed from the final bit of
+  ; Windows kernel API-using code; the rest are not present.
+  mov eax, dword [kx_page_directory]
+  mov dword [pdpt_entry1], eax
+  mov eax, dword [kx_page_directory+4]
+  mov dword [pdpt_entry1+4], eax
 
-  ; Drop back to real mode.
-  mov eax, cr0
-  and al, 0xfe
-  mov cr0, eax
+  ; Build the first page directory at 0x00006000.
+  ; We only need one page table: it will identity-map the entire first
+  ; megabyte of physical RAM (where we are), and let us map the areas
+  ; of higher RAM that we need into the second megabyte in order to
+  ; move stuff around.
+  mov ecx, 1024
+  mov edi, 0x00006000
+  rep stosd
+  mov dword [0x00006000], 0x00007023
 
-  ; Make an absolute jump below to put us in full-blown 16-bit real mode.
-  jmp 0x0000:in16bitrmode
-in16bitrmode:
+  ; Build the page table for the first two megabytes of address space
+  ; at 0x00007000.  The first megabyte is entirely an identity mapping;
+  ; the second megabyte is left unmapped.
+  mov eax, 0x00000023
+  mov edi, 0x00007000
+  cld
+.writeAnotherEntry:
+  stosd
+  add edi, 4
+  add eax, 0x00001000
+  cmp eax, 0x00100000
+  jb .writeAnotherEntry
 
-  ; Finally load the segment registers with genuine real-mode values.
-  xor ax, ax
-  mov ds, ax
-  mov es, ax
-  mov fs, ax
-  mov gs, ax
-  mov ss, ax
-
-  ; Leetness! We've entered 1980s-land!  Our task now is to reassemble
-  ; and boot the kernel.  Hopefully the BIOS services (at least int 0x10
-  ; and especially 0x15) will work.
+  ; So it's come to this.  We're in real mode now, and our task now is to
+  ; reassemble and boot the kernel.  Hopefully the BIOS services (at least
+  ; int 0x10 and especially 0x15) will work.
 
   ; We really should leave interrupts disabled just in case Windows did
   ; something really strange.  We don't really need interrupts to be
@@ -99,10 +108,23 @@ in16bitrmode:
   test edx, 0x00000040
   jz noPAE
 
-  ; Put the kernel and initrd back together.
-  call theGreatReshuffling
+  ; Go into protected mode.
+  call realToProt
+  bits 32
 
-  ; This code is a stump.  You can help by expanding it.
+  ; Call the C code to put the kernel and initrd back together.
+  ; Pass it a pointer to the boot information structure.
+  push dword bootinfo
+  call c_code
+  add esp, 4
+
+  ; Go back into real mode.
+  call protToReal
+  bits 16
+
+  ; Say that we got to the end of implemented functionality.
+  mov si, stumpmsg
+  call display
   jmp short cliHlt
 
 noPAE:
@@ -132,17 +154,31 @@ display:
 .done:
   ret
 
-  ; Reassemble the kernel and initrd and populate our base variables.
-  ; Temporarily goes into 32-bit protected mode with PAE in order to do that.
-  ; Trashes all registers.
-theGreatReshuffling:
-  ; Protected mode, here we come!
-  ; Start by stashing the current stack pointer.
-  mov word [real_stack_pointer], sp
-  mov ax, ss
-  mov word [real_stack_segment], ss
 
-  ; Our new GDT.
+  ; Switch from real mode to protected mode.
+  ; Preconditions:
+  ;  - Interrupts are disabled.
+  ;  - The page directory pointer table in our data section is valid and
+  ;    identity-maps this routine and the routine we are returning to.
+  ;  - The stored protected mode stack is valid.
+  ;  - The caller's code and data segments are zero.
+  ;  - The processor supports PAE.
+  ; Postconditions:
+  ;  - Real mode stack is stored.
+  ;  - Returns in 32-bit protected mode with paging and PAE enabled.
+  ;  - The active page directory pointer table is the one in our data section.
+realToProt:
+  bits 16
+
+  ; Save our return address.
+  pop dx
+
+  ; Save the real mode stack.
+  mov ax, ss
+  mov word [real_stack_segment], ax
+  mov word [real_stack_pointer], sp
+
+  ; Install the GDT just in case.
   lgdt [gdttag]
 
   ; Protected mode ON!
@@ -156,121 +192,124 @@ theGreatReshuffling:
   bits 32
 
   ; Fix up the segments we're going to need in 32-bit protected mode.
-  mov eax, 0x00000010
+  ; Also switch to the protected mode stack.
+  mov ax, 0x0010
   mov ds, ax
   mov es, ax
-  mov ss, ax
-  mov esp, 0x00006ffc
+  mov fs, ax
+  mov gs, ax
+  mov ss, word [prot_stack_segment]
+  mov esp, dword [prot_stack_pointer]
 
   ; Turn on PAE.
   mov eax, cr4
   or al, 0x20
   mov cr4, eax
 
-  ; Build the page directory pointer table at 0x00007000.
-  ; The first page directory will go at 0x00090000; the second is the
-  ; one we are passed from the final bit of Windows kernel API-using
-  ; code; the rest are not present.
-  cld
-  xor eax, eax
-  mov ecx, 8
-  mov edi, 0x00007000
-  rep stosd
-  mov dword [0x00007000], 0x00090001
-  mov eax, dword [kx_page_directory]
-  mov dword [0x00007008], eax
-  mov eax, dword [kx_page_directory+4]
-  mov dword [0x0000700c], eax
-
-  ; Build the page directory at 0x00090000.
-  ; We only need one page table: it will identity-map the entire first
-  ; megabyte of physical RAM (where we are), and let us map the areas
-  ; of higher RAM that we need into the second megabyte in order to
-  ; move stuff around.
-  mov ecx, 1024
-  mov edi, 0x00090000
-  rep stosd
-  mov dword [0x00090000], 0x00091023
-
-  ; Build the page table for the first two megabytes of address space
-  ; at 0x00091000.  The first megabyte is entirely an identity mapping;
-  ; the second megabyte is left unmapped.
-  mov eax, 0x00000023
-  mov edi, 0x00091000
-.writeAnotherEntry:
-  stosd
-  add edi, 4
-  add eax, 0x00001000
-  cmp eax, 0x00100000
-  jb .writeAnotherEntry
-
   ; Turn on paging.
-  mov eax, 0x00007000
+  mov eax, page_directory_pointer_table
   mov cr3, eax
   mov eax, cr0
   or eax, 0x80000000
   mov cr0, eax
 
-  ; Call the C code to perform the necessary page swapping.
-  ; Pass it a pointer to the boot information structure.
-  push dword bootinfo
-  call c_code
-  add esp, 4
+  ; Return to the saved return address.
+  movzx eax, dx
+  push eax
+  ret
 
-  ; Turn off paging.
+
+  ; Switch from protected mode to real mode.
+  ; Preconditions:
+  ;  - If paging is on, this routine is in identity-mapped memory.
+  ;  - The return address is strictly less than 0x00010000 (64 KB).
+  ;  - Interrupts are disabled.
+  ;  - The stored real mode stack is valid.
+  ; Postconditions:
+  ;  - Protected mode stack is stored.
+  ;  - Returns in 16-bit real mode.
+protToReal:
+  bits 32
+
+  ; Save our return address.
+  pop edx
+
+  ; Save the protected mode stack.
+  mov ax, ss
+  mov word [prot_stack_segment], ax
+  mov dword [prot_stack_pointer], esp
+
+  ; Paging, be gone!
   mov eax, cr0
   and eax, 0x7fffffff
   mov cr0, eax
   xor eax, eax
-  mov cr3, eax
+  mov cr3, eax  ; Paging, be very gone.  (Nuke the TLB.)
 
-  ; Turn off PAE.
+  ; Turn off PAE, if it's on.
   mov eax, cr4
   and al, 0xdf
   mov cr4, eax
 
-  ; Temporarily drop to 16-bit protected mode.
-  jmp 0x0018:.halfwayOutOfProtectedMode
-.halfwayOutOfProtectedMode:
+  ; Install the new GDT, just in case this is the first time we're switching.
+  lgdt [gdttag]
+
+  ; Enter 16-bit protected mode through the new GDT.
+  jmp 0x0018:.in16bitpmode
+.in16bitpmode:
   bits 16
 
-  ; Fix the segment limits by loading real-mode-appropriate descriptors
-  ; into the segment registers that we have touched.
+  ; Load real-mode-appropriate segments so the descriptor
+  ; cache registers don't get royally messed up.
   mov ax, 0x0020
   mov ds, ax
   mov es, ax
+  mov fs, ax
+  mov gs, ax
   mov ss, ax
 
-  ; Protected mode OFF!
+  ; Apply the real mode interrupt vector table.
+  lidt [real_idttag]
+
+  ; Drop back to real mode.
   mov eax, cr0
   and al, 0xfe
   mov cr0, eax
 
-  ; Fix up CS.
-  jmp 0x0000:.fullyOutOfProtectedMode
-.fullyOutOfProtectedMode:
+  ; Make an absolute jump below to put us in full-blown 16-bit real mode.
+  jmp 0x0000:.in16bitrmode
+.in16bitrmode:
 
-  ; Load the real mode values back into the segments that were used.
+  ; Finally load the segment registers with genuine real-mode values.
+  ; Also switch to the real mode stack.
   xor ax, ax
   mov ds, ax
   mov es, ax
-
-  ; Unstash the old stack pointer and return.
+  mov fs, ax
+  mov gs, ax
   mov ax, word [real_stack_segment]
   mov ss, ax
   mov sp, word [real_stack_pointer]
+
+  ; Return to the saved return address.
+  push dx
   ret
+
 
 ; Variables
 align 4
 real_stack_pointer dw 0
 real_stack_segment dw 0
+prot_stack_pointer dd 0
+prot_stack_segment dw 0
 
 ; Strings
 banner db 'WinKexec: Linux bootloader implemented as a Windows device driver',\
   0x0d,0x0a,'Copyright (C) 2008-2009 John Stumpo',0x0d,0x0a,0x0d,0x0a,0x00
 noPAEmsg db 'This processor does not support PAE.',0x0d,0x0a,\
   'PAE support is required in order to use WinKexec.',0x0d,0x0a,0x00
+stumpmsg db 'This program is a stump.  You can help by expanding it.',\
+  0x0d,0x0a,0x00  ; in honor of Kyle
 
 ; The global descriptor table used for the deactivation of paging,
 ; the initial switch back to real mode, the kernel reshuffling,
@@ -284,13 +323,24 @@ gdtstart:
   real_dataseg dq 0x000093000000ffff
 gdtend:
 
+; The pointer to the global descriptor table, used when loading it.
 gdttag:
   gdtsize dw (gdtend - gdtstart - 1)
   gdtptr dd gdtstart
 
+; The pointer to the real mode interrupt vector table,
+; used when loading it.
 real_idttag:
   real_idtsize dw 0x03ff
   real_idtptr dd 0x00000000
+
+; The page directory pointer table used when re-entering protected mode.
+  align 32
+page_directory_pointer_table:
+  pdpt_entry0 dq 0x0000000000006001
+  pdpt_entry1 dq 0x0000000000000000
+  pdpt_entry2 dq 0x0000000000000000
+  pdpt_entry3 dq 0x0000000000000000
 
   times (4016 - ($ - $$)) db 0x00  ; pad to 4KB minus 80 bytes
 
