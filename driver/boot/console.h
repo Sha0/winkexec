@@ -15,22 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Functions to deal with the swapping of memory areas pointed to
-   by arrays of 64-bit physical pointers.  */
+#ifndef CONSOLE_H
+#define CONSOLE_H
 
-#ifndef SWAPPTR_H
-#define SWAPPTR_H
+typedef void(*bios_putchar_t)(unsigned char);
 
-typedef union _PTR64 {
-  unsigned long long quad_part;
-  struct {
-    unsigned long low_part;
-    unsigned long high_part;
-  };
-} PTR64, *PPTR64;
+void console_init(bios_putchar_t putch);
 
-void swap_ptr64s(PTR64 p1, PTR64 p2,
-  PPTR64 kernel_start, PPTR64 kernel_end,
-  PPTR64 initrd_start, PPTR64 initrd_end, PPTR64 cmdline_start);
+int putchar(int c);
+void putstr(const char* str);
 
 #endif

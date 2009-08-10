@@ -21,7 +21,9 @@ CFLAGS += -I../include -DDRIVER
 KEXEC_SYS_OBJECTS = buffer.o entry.o io.o libpe.o linuxboot.o reboot.o resource.o sha1.o util.o
 KEXEC_SYS_LIBS = -lntoskrnl -lhal
 
-BOOT_REASSEMBLE_EXE_OBJECTS = boot/reassemble.o boot/swapptr.o boot/swappages.o
+# boot/reassemble.o *must* be first!
+# The entry point is the first function in the first file given.
+BOOT_REASSEMBLE_EXE_OBJECTS = boot/reassemble.o boot/console.o
 
 __main_target : kexec.sys kexec.inf
 
@@ -41,10 +43,10 @@ linuxboot.o : boot/bootcode.h
 boot/bootcode.bin : boot/reassemble.bin
 
 boot/reassemble.bin : boot/reassemble.exe
-	$(OBJCOPY) -O binary -R .idata boot/reassemble.exe boot/reassemble.bin
+	$(OBJCOPY) -O binary -j .text boot/reassemble.exe boot/reassemble.bin
 
 boot/reassemble.exe : $(BOOT_REASSEMBLE_EXE_OBJECTS)
-	$(CC) $(CFLAGS) -nostdlib -Wl,--image-base,0x00009000 -o boot/reassemble.exe $(BOOT_REASSEMBLE_EXE_OBJECTS)
+	$(LD) -s -T boot/reassemble.ld -o boot/reassemble.exe $(BOOT_REASSEMBLE_EXE_OBJECTS)
 
 .bin.h :
 	$(PYTHON) bin2h.py $< $@ "$(shell basename $< | sed -e 's/[^a-z]/_/g')"

@@ -15,18 +15,16 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Some code to help reassemble the kernel and initrd in memory.
-   Execution of this chunk of C code will begin with the only function
-   in this file, which is _reassemble_start, as we link this first into the
-   flat binary.  */
+ENTRY(__reassemble_start);
 
-#include "bootinfo.h"
-#include "console.h"
-
-/* The entry point.  Takes a pointer to the boot info structure and
-   a pointer to the character output function.  */
-void _reassemble_start(struct bootinfo* info, bios_putchar_t putch)
+SECTIONS
 {
-  console_init(putch);
-  putstr("Hello World\n");
+  /* Lump everything together at 0x00009000. */
+  . = 0x00009000;
+  .text : {
+    *(.text);
+    *(.rdata);
+    *(.data);
+    *(.bss);
+  }
 }

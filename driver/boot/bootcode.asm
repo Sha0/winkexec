@@ -113,10 +113,12 @@ _start:
   bits 32
 
   ; Call the C code to put the kernel and initrd back together.
-  ; Pass it a pointer to the boot information structure.
+  ; Pass it a pointer to the boot information structure
+  ; and a pointer to the character output routine.
+  push dword bios_putchar
   push dword bootinfo
   call c_code
-  add esp, 4
+  add esp, 8
 
   ; Go back into real mode.
   call protToReal
@@ -293,6 +295,38 @@ protToReal:
 
   ; Return to the saved return address.
   push dx
+  ret
+
+
+  ; Runs int 0x10 AH=0x0e with the passed value as AL.
+  ; C prototype: void bios_putchar(unsigned char);
+  align 16
+bios_putchar:
+  bits 32
+
+  push ebp
+  mov ebp, esp
+  push edi
+  push esi
+  push ebx
+
+  ; Grab the character from the argument list.
+  mov ecx, dword [ebp + 8]
+
+  ; Do it.
+  call protToReal
+  bits 16
+  mov ah, 0x0e
+  mov al, cl
+  mov bx, 0x0007
+  int 0x10
+  call realToProt
+  bits 32
+
+  pop ebx
+  pop esi
+  pop edi
+  pop ebp
   ret
 
 
