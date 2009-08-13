@@ -43,6 +43,15 @@ _start:
   call protToReal
   bits 16
 
+  ; Reset the control registers that might affect what we are doing
+  ; to a known state.  (Now we don't have to worry about potential
+  ; nasties like Windows' page mappings still being cached due to
+  ; cr4.pge, which Windows likes to set.)
+  mov eax, 0x60000010
+  mov cr0, eax
+  xor eax, eax
+  mov cr4, eax
+
   ; Initialize the protected mode stack; it will begin at 0x000057fc.
   ; This leaves 2 KB for the real mode stack, just in case the BIOS is
   ; overly greedy with regard to stack space.  This stack will go into
@@ -66,17 +75,25 @@ _start:
   ; megabyte of physical RAM (where we are), and let us map the areas
   ; of higher RAM that we need into the second megabyte in order to
   ; move stuff around.
+  cld
   mov ecx, 1024
   mov edi, 0x00006000
   rep stosd
   mov dword [0x00006000], 0x00007023
 
   ; Build the page table for the first two megabytes of address space
-  ; at 0x00007000.  The first megabyte is entirely an identity mapping;
-  ; the second megabyte is left unmapped.
-  mov eax, 0x00000023
+  ; at 0x00007000.  The first megabyte is entirely an identity mapping,
+  ; with the exception of the bottom-most page (so we can detect if the
+  ; C code tries to follow a null pointer); the second megabyte is left
+  ; unmapped.  We zero the page out first because it is likely to contain
+  ; garbage from system boot, as boot sectors often like to put their
+  ; stack in this area.
+  xor eax, eax
+  mov ecx, 1024
   mov edi, 0x00007000
-  cld
+  rep stosd
+  mov eax, 0x00001023
+  mov edi, 0x00007008
 .writeAnotherEntry:
   stosd
   add edi, 4
@@ -203,6 +220,9 @@ realToProt:
   mov ss, word [prot_stack_segment]
   mov esp, dword [prot_stack_pointer]
 
+  ; Apply the protected mode interrupt descriptor table.
+  lidt [idttag]
+
   ; Turn on PAE.
   mov eax, cr4
   or al, 0x20
@@ -298,6 +318,161 @@ protToReal:
   ret
 
 
+  ; Stub handlers for protected mode exceptions.
+  ; Macro arguments: [int number], [0 or 1 for whether an error code is pushed]
+  bits 32
+%macro define_isr 2
+int%1_isr:
+%if %2 == 0
+  push dword 0  ; as a dummy since the processor doesn't push an error code
+%endif
+  push dword %1
+  jmp isr_common
+%endmacro
+  define_isr 0x00, 0  ; division by zero
+  define_isr 0x01, 0  ; debug exception
+  define_isr 0x02, 0  ; non-maskable interrupt
+  define_isr 0x03, 0  ; breakpoint
+  define_isr 0x04, 0  ; overflow
+  define_isr 0x05, 0  ; bound range exceeded
+  define_isr 0x06, 0  ; invalid opcode
+  define_isr 0x08, 1  ; double fault
+  define_isr 0x0a, 1  ; invalid task state segment
+  define_isr 0x0b, 1  ; segment not present
+  define_isr 0x0c, 1  ; stack segment fault
+  define_isr 0x0d, 1  ; general protection fault
+  define_isr 0x0e, 1  ; page fault
+  define_isr 0x10, 0  ; floating point exception
+
+  ; The common interrupt service routine.
+  ; Stack state:  [bottom; top of previous stack]
+  ;               previous EFL
+  ;               previous CS
+  ;               previous EIP
+  ;               error code (or placeholder zero)
+  ;               exception number
+  ;               [top]
+isr_common:
+  ; Stash all other registers.
+  pushad
+  push ds
+  push es
+  push fs
+  push gs
+  ; stack (top to bottom):
+  ; gs fs es ds edi esi ebp esp-0x14 ebx ecx edx eax excno errcode eip cs efl
+  ; offsets from esp (hex):
+  ; 00 04 08 0c 10  14  18  1c       20  24  28  2c  30    34      38  3c 40
+
+  ; Display the proper error message.
+  mov eax, dword [esp+0x30]
+  mov esi, dword [error_code_table + 4*eax]
+  call bios_putstr
+  mov esi, errcode_separator
+  call bios_putstr
+  mov eax, dword [esp+0x34]
+  call bios_puthex
+
+  ; Dump the registers.
+%macro dump_reg 2
+  mov esi, %1_is
+  call bios_putstr
+  mov eax, dword [esp+%2]
+  call bios_puthex
+%endmacro
+%macro dump_real_reg 1
+  mov esi, %1_is
+  call bios_putstr
+  mov eax, %1
+  call bios_puthex
+%endmacro
+  dump_reg eax, 0x2c
+  dump_reg ebx, 0x20
+  dump_reg ecx, 0x24
+  dump_reg edx, 0x28
+  dump_reg esi, 0x14
+  dump_reg edi, 0x10
+  dump_reg ebp, 0x18
+  mov esi, esp_is
+  call bios_putstr
+  mov eax, dword [esp+0x1c]
+  add eax, 0x14
+  call bios_puthex
+  dump_reg eip, 0x38
+  dump_reg efl, 0x40
+  dump_reg  cs, 0x3c
+  dump_real_reg ss
+  dump_reg  ds, 0x0c
+  dump_reg  es, 0x08
+  dump_reg  fs, 0x04
+  dump_reg  gs, 0x00
+  dump_real_reg cr0
+  dump_real_reg cr2
+  dump_real_reg cr3
+  dump_real_reg cr4
+
+  ; Halt the system.
+  mov esi, system_halted
+  call bios_putstr
+  cli
+.hltloop:
+  hlt
+  jmp short .hltloop
+
+  ; Were we to return, though, we'd restore register state...
+  pop gs
+  pop fs
+  pop es
+  pop ds
+  popad
+  ; ...discard the error code and exception number, and then return.
+  add esp, 8
+  iret
+
+
+  ; Used only by exception handlers.
+  ; Takes address of string in esi, which must be in real mode segment zero.
+bios_putstr:
+  bits 32
+  call protToReal
+  bits 16
+  call display
+  call realToProt
+  bits 32
+  ret
+
+  ; Used only by exception handlers.
+  ; Writes eax out in hex.
+bios_puthex:
+  bits 32
+  push ebp
+  mov ebp, esp
+  sub esp, 4
+
+  mov ebx, eax
+  mov edi, 8
+
+.printloop:
+  rol ebx, 4
+  mov al, bl
+  and al, 0x0f
+  cmp al, 0x0a
+  jl .usedigit
+  add al, 'a' - 0x0a  ; convert to a-f
+  jmp short .converted
+.usedigit:
+  add al, '0'
+.converted:
+  movzx eax, al
+  mov dword [esp], eax
+  call bios_putchar
+  sub edi, 1
+  jnz .printloop
+
+  leave
+  ret  
+
+
   ; Runs int 0x10 AH=0x0e with the passed value as AL.
   ; C prototype: void bios_putchar(unsigned char);
   align 16
@@ -344,6 +519,63 @@ noPAEmsg db 'This processor does not support PAE.',0x0d,0x0a,\
   'PAE support is required in order to use WinKexec.',0x0d,0x0a,0x00
 stumpmsg db 'This program is a stump.  You can help by expanding it.',\
   0x0d,0x0a,0x00  ; in honor of Kyle
+errcode_separator db ', errcode=',0x00
+eax_is db 0x0d,0x0a,'eax=',0x00
+ebx_is db         '  ebx=',0x00
+ecx_is db         '  ecx=',0x00
+edx_is db         '  edx=',0x00
+esi_is db 0x0d,0x0a,'esi=',0x00
+edi_is db         '  edi=',0x00
+ebp_is db         '  ebp=',0x00
+esp_is db         '  esp=',0x00
+eip_is db 0x0d,0x0a,'eip=',0x00
+efl_is db         '  efl=',0x00
+ cs_is db         '   cs=',0x00
+ ss_is db         '   ss=',0x00
+ ds_is db 0x0d,0x0a,' ds=',0x00
+ es_is db         '   es=',0x00
+ fs_is db         '   fs=',0x00
+ gs_is db         '   gs=',0x00
+cr0_is db 0x0d,0x0a,'cr0=',0x00
+cr2_is db         '  cr2=',0x00
+cr3_is db         '  cr3=',0x00
+cr4_is db         '  cr4=',0x00
+system_halted db 0x0d,0x0a,0x0d,0x0a,'System halted.',0x0d,0x0a,0x00
+exc0x00_msg db 'Division by zero',0x00
+exc0x01_msg db 'Debug exception',0x00
+exc0x02_msg db 'Non-maskable interrupt',0x00
+exc0x03_msg db 'Breakpoint',0x00
+exc0x04_msg db 'Overflow',0x00
+exc0x05_msg db 'Bound range exceeded',0x00
+exc0x06_msg db 'Invalid opcode',0x00
+exc0x08_msg db 'Double fault',0x00
+exc0x0a_msg db 'Invalid task state segment',0x00
+exc0x0b_msg db 'Segment not present',0x00
+exc0x0c_msg db 'Stack segment fault',0x00
+exc0x0d_msg db 'General protection fault',0x00
+exc0x0e_msg db 'Page fault',0x00
+exc0x10_msg db 'Floating point exception',0x00
+
+; The table mapping exception numbers to error messages.
+  align 4
+error_code_table:
+  dd exc0x00_msg
+  dd exc0x01_msg
+  dd exc0x02_msg
+  dd exc0x03_msg
+  dd exc0x04_msg
+  dd exc0x05_msg
+  dd exc0x06_msg
+  dd 0
+  dd exc0x08_msg
+  dd 0
+  dd exc0x0a_msg
+  dd exc0x0b_msg
+  dd exc0x0c_msg
+  dd exc0x0d_msg
+  dd exc0x0e_msg
+  dd 0
+  dd exc0x10_msg
 
 ; The global descriptor table used for the deactivation of paging,
 ; the initial switch back to real mode, the kernel reshuffling,
@@ -357,10 +589,40 @@ gdtstart:
   real_dataseg dq 0x000093000000ffff
 gdtend:
 
+; The interrupt descriptor table used for protected mode exception handling.
+; Since we know that the handler addresses fit entirely in the lower
+; 16 bits, we can cheat when forming the entries and not split the words.
+%define IDT_BASE_DESCRIPTOR 0x00008e0000080000
+  align 8
+idtstart:
+  dq IDT_BASE_DESCRIPTOR + int0x00_isr
+  dq IDT_BASE_DESCRIPTOR + int0x01_isr
+  dq IDT_BASE_DESCRIPTOR + int0x02_isr
+  dq IDT_BASE_DESCRIPTOR + int0x03_isr
+  dq IDT_BASE_DESCRIPTOR + int0x04_isr
+  dq IDT_BASE_DESCRIPTOR + int0x05_isr
+  dq IDT_BASE_DESCRIPTOR + int0x06_isr
+  dq 0
+  dq IDT_BASE_DESCRIPTOR + int0x08_isr
+  dq 0
+  dq IDT_BASE_DESCRIPTOR + int0x0a_isr
+  dq IDT_BASE_DESCRIPTOR + int0x0b_isr
+  dq IDT_BASE_DESCRIPTOR + int0x0c_isr
+  dq IDT_BASE_DESCRIPTOR + int0x0d_isr
+  dq IDT_BASE_DESCRIPTOR + int0x0e_isr
+  dq 0
+  dq IDT_BASE_DESCRIPTOR + int0x10_isr
+idtend:
+
 ; The pointer to the global descriptor table, used when loading it.
 gdttag:
   gdtsize dw (gdtend - gdtstart - 1)
   gdtptr dd gdtstart
+
+; The pointer to the interrupt descriptor table, used when loading it.
+idttag:
+  idtsize dw (idtend - idtstart - 1)
+  idtptr dd idtstart
 
 ; The pointer to the real mode interrupt vector table,
 ; used when loading it.

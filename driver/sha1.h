@@ -37,6 +37,6 @@
 #include <stdint.h>
 #include <stddef.h>
 
-void sha1(void* outbuf, void* inbuf, size_t length);
+void sha1(void* outbuf, const void* inbuf, size_t length);
 
 #endif

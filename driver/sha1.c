@@ -40,7 +40,7 @@
 #define ROR(a, b) ROL((a), (32 - (b)))
 
 /* Copy srclen bytes of src to dest, padding with zeros to dstlen. */
-static void _copy_buffer(void* dest, void* src, size_t srclen, size_t dstlen)
+static void _copy_buffer(void* dest, const void* src, size_t srclen, size_t dstlen)
 {
   size_t i;
   for (i = 0; i < dstlen; i++) {
@@ -52,7 +52,7 @@ static void _copy_buffer(void* dest, void* src, size_t srclen, size_t dstlen)
 }
 
 /* The SHA1 implementation proper. */
-void sha1(void* outbuf, void* inbuf, size_t length)
+void sha1(void* outbuf, const void* inbuf, size_t length)
 {
   size_t i, j;
   int remaining_bytes;
