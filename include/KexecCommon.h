@@ -33,6 +33,7 @@ KEXECCOMMON_SPEC BOOL KxcErrorOccurred(void);
 KEXECCOMMON_SPEC const char* KxcGetErrorMessage(void);
 KEXECCOMMON_SPEC void KxcReportErrorStderr(void);
 KEXECCOMMON_SPEC void KxcReportErrorMsgbox(HWND parent);
+KEXECCOMMON_SPEC void KxcAboutWinKexec(HWND parent);
 KEXECCOMMON_SPEC PVOID KxcLoadFile(const char* filename, DWORD* length);
 KEXECCOMMON_SPEC BOOL KxcDriverOperation(DWORD opcode, LPVOID ibuf, DWORD ibuflen, LPVOID obuf, DWORD obuflen);
 KEXECCOMMON_SPEC BOOL KxcIsDriverLoaded(void);

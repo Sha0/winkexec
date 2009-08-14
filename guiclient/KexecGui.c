@@ -15,8 +15,8 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define _WIN32_IE 0x0500
 #define _WIN32_WINNT 0x0500
+#define _WIN32_IE 0x0500
 
 #include <windows.h>
 #include <commctrl.h>
@@ -285,6 +285,11 @@ static BOOL CALLBACK KxgMainDlgProc(HWND hDlg, UINT msg,
 
           KxgUpdateDriverState(hDlg);
 
+          break;
+
+        case KXG_ID_HELP_ABOUT:
+          /* "About WinKexec..." option in the Help menu */
+          KxcAboutWinKexec(hDlg);
           break;
 
         default:

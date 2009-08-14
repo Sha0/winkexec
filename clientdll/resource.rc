@@ -18,6 +18,8 @@
 #include <winuser.h>
 #include <winver.h>
 
+#include "resource.h"
+
 #include "../revtag/revtag.h"
 
 LANGUAGE 9, 1
@@ -48,4 +50,24 @@ BEGIN
   BEGIN
     VALUE "Translation", 0x409, 1200
   END
+END
+
+KXC_ABOUT_DLG DIALOGEX 0, 0, 260, 135
+ STYLE DS_MODALFRAME | WS_POPUP | WS_CAPTION | WS_SYSMENU
+ CAPTION "About WinKexec"
+ FONT 8, "MS Shell Dlg", 0, 0, 1
+BEGIN
+  DEFPUSHBUTTON "OK", IDCANCEL, 203, 114, 50, 14
+
+  GROUPBOX "About WinKexec", 50, 7, 7, 246, 103
+
+  LTEXT "WinKexec version 1.0, svn revision " SVN_REVISION_STR "\r\n"
+        "Copyright \251 2008-2009 John Stumpo\r\n"
+        "\r\n"
+        "WinKexec is free software under the GNU General Public License version "
+        "3 or later; you are free to modify and redistribute it under certain "
+        "conditions. There is ABSOLUTELY NO WARRANTY, to the extent allowable "
+        "by applicable law.", 2000, 13, 18, 234, 72
+
+  PUSHBUTTON "Home page: http://www.jstump.com/", KXC_ID_HOMEPAGE, 13, 93, 234, 10, BS_OWNERDRAW
 END

@@ -18,8 +18,8 @@ include ../common.mk
 
 CFLAGS += -I../include
 
-KEXECCOMMON_DLL_OBJECTS = KexecCommon.o resource.o
-KEXECCOMMON_DLL_LIBS = -lkernel32 -lmsvcrt -ladvapi32 -luser32
+KEXECCOMMON_DLL_OBJECTS = about.o KexecCommon.o resource.o
+KEXECCOMMON_DLL_LIBS = -lkernel32 -lmsvcrt -ladvapi32 -luser32 -lshell32 -lgdi32
 
 __main_target : KexecCommon.dll KexecCommon.lib
 

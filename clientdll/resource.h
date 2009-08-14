@@ -1,5 +1,5 @@
 /* WinKexec: kexec for Windows
- * Copyright (C) 2008 John Stumpo
+ * Copyright (C) 2008-2009 John Stumpo
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,27 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KEXEC_GUI_RESOURCES_H
-#define KEXEC_GUI_RESOURCES_H
+#ifndef KXC_RESOURCE_H
+#define KXC_RESOURCE_H
 
-#define KXG_ICON 1
-#define KXG_MAIN_DLG 1
-#define KXG_MAIN_MENU 1
+#define KXC_ABOUT_DLG 1
 
-#define KXG_ID_KERNEL_SWITCH 20
-#define KXG_ID_INITRD_SWITCH 21
-
-#define KXG_ID_KERNEL_FILENAME 8000
-#define KXG_ID_KERNEL_COMMAND_LINE 8001
-#define KXG_ID_INITRD_FILENAME 8002
-
-#define KXG_ID_KERNEL_BROWSE 22
-#define KXG_ID_INITRD_BROWSE 23
-
-#define KXG_ID_CONTROL_DRIVER 24
-
-#define KXG_ID_STATUS_TEXT 2000
-
-#define KXG_ID_HELP_ABOUT 3000
+#define KXC_ID_HOMEPAGE 20
 
 #endif

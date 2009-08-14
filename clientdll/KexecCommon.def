@@ -19,6 +19,7 @@ KxcErrorOccurred
 KxcGetErrorMessage
 KxcReportErrorStderr
 KxcReportErrorMsgbox
+KxcAboutWinKexec
 KxcLoadFile
 KxcDriverOperation
 KxcIsDriverLoaded

@@ -22,6 +22,8 @@
 
 static char kxciLastErrorMsg[256];
 
+HINSTANCE hInst;
+
 
 /* Convenient wrapper around FormatMessage() and GetLastError() */
 static LPSTR KxciTranslateError(void)
@@ -283,4 +285,11 @@ KEXEC_DLLEXPORT BOOL KxcUnloadDriver(void)
 KEXEC_DLLEXPORT void KxcInit(void)
 {
   KxciResetErrorMessage();
+}
+
+BOOL WINAPI DllMain(HINSTANCE in_hInst, DWORD reason KEXEC_UNUSED,
+  LPVOID lpvReserved KEXEC_UNUSED)
+{
+  hInst = in_hInst;
+  return TRUE;
 }
