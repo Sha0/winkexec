@@ -18,6 +18,7 @@
 #include "verify.h"
 #include "string.h"
 #include "console.h"
+#include "stdlib.h"
 #include "../sha1.h"
 
 const char* hexdigits = "0123456789abcdef";
@@ -44,8 +45,7 @@ void verify_hash(const void* data, size_t len, const unsigned char* hash)
       putchar(hexdigits[c & 0x0f]);
     }
     putstr("\nAborting.\n");
-    while (1)
-      __asm__ __volatile__ ("hlt");
+    abort();
   }
 
 }

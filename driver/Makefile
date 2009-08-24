@@ -23,7 +23,7 @@ KEXEC_SYS_LIBS = -lntoskrnl -lhal
 
 # boot/reassemble.o *must* be first!
 # The entry point is the first function in the first file given.
-BOOT_REASSEMBLE_EXE_OBJECTS = boot/reassemble.o boot/console.o boot/string.o boot/verify.o sha1.o
+BOOT_REASSEMBLE_EXE_OBJECTS = boot/reassemble.o boot/console.o boot/pagesort.o boot/stdlib.o boot/string.o boot/verify.o sha1.o util.o
 
 __main_target : kexec.sys kexec.inf
 

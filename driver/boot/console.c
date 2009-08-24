@@ -17,6 +17,7 @@
 
 #include "console.h"
 
+extern const char* hexdigits;
 static bios_putchar_t __bios_putchar;
 
 
@@ -45,4 +46,16 @@ void putstr(const char* str)
   const char* i;
   for (i = str; *i; i++)
     putchar(*i);
+}
+
+
+/* Output a 32-bit word in hexadecimal. */
+void puthex(uint32_t w)
+{
+  int i;
+
+  putstr("0x");
+  for (i = 28; i >= 0; i -= 4)
+    putchar(hexdigits[(w >> i) & 0x0000000f]);
+
 }

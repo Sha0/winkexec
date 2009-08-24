@@ -15,12 +15,11 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KX_STRING_H
-#define KX_STRING_H
+#ifndef KX_STDLIB_H
+#define KX_STDLIB_H
 
-#include <stddef.h>
+#include <kexec.h>
 
-int memcmp(const void*, const void*, size_t);
-void* memcpy(void*, const void*, size_t);
+void KEXEC_NORETURN abort(void);
 
 #endif

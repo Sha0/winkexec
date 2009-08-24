@@ -32,11 +32,12 @@
 _start:
   bits 32
 
-  ; Initialize the real mode stack; it will begin at 0x0000:0x5ffe.
-  ; This leaves a gap of two pages (8 KB) below this code so we can
-  ; put the identity-mapping page directory and page table there.
+  ; Initialize the real mode stack; it will begin at 0x0000:0x4ffe.
+  ; This leaves a gap of three pages (12 KB) below this code so we can
+  ; put the identity-mapping page directory and page table there and
+  ; have a scratch page available.
   mov word [real_stack_segment], 0x0000
-  mov word [real_stack_pointer], 0x5ffe
+  mov word [real_stack_pointer], 0x4ffe
 
   ; Leave protected mode.  When we return, the stack we set up above
   ; will be in effect.
@@ -52,12 +53,12 @@ _start:
   xor eax, eax
   mov cr4, eax
 
-  ; Initialize the protected mode stack; it will begin at 0x000057fc.
+  ; Initialize the protected mode stack; it will begin at 0x000047fc.
   ; This leaves 2 KB for the real mode stack, just in case the BIOS is
   ; overly greedy with regard to stack space.  This stack will go into
   ; effect when realToProt is called.
   mov word [prot_stack_segment], 0x0010
-  mov dword [prot_stack_pointer], 0x000057fc
+  mov dword [prot_stack_pointer], 0x000047fc
 
   ; Populate the page directory pointer table embedded within us.
   ; (Really, that just means copying kx_page_directory to its second
@@ -74,12 +75,18 @@ _start:
   ; We only need one page table: it will identity-map the entire first
   ; megabyte of physical RAM (where we are), and let us map the areas
   ; of higher RAM that we need into the second megabyte in order to
-  ; move stuff around.
+  ; move stuff around.  We also add the page directory that maps the kernel
+  ; as a page table, giving us simple access to the kernel map page tables.
   cld
   mov ecx, 1024
   mov edi, 0x00006000
   rep stosd
   mov dword [0x00006000], 0x00007023
+  mov eax, dword [pdpt_entry1]
+  or al, 0x23
+  mov dword [0x00006ff8], eax
+  mov eax, dword [pdpt_entry1+4]
+  mov dword [0x00006ffc], eax
 
   ; Build the page table for the first two megabytes of address space
   ; at 0x00007000.  The first megabyte is entirely an identity mapping,
@@ -87,7 +94,8 @@ _start:
   ; C code tries to follow a null pointer); the second megabyte is left
   ; unmapped.  We zero the page out first because it is likely to contain
   ; garbage from system boot, as boot sectors often like to put their
-  ; stack in this area.
+  ; stack in this area.  We also map the kernel map page directory (by
+  ; copying the page directory entry) so we can access it.
   xor eax, eax
   mov ecx, 1024
   mov edi, 0x00007000
@@ -100,6 +108,10 @@ _start:
   add eax, 0x00001000
   cmp eax, 0x00100000
   jb .writeAnotherEntry
+  mov eax, dword [0x00006ff8]
+  mov dword [0x00007ff8], eax
+  mov eax, dword [0x00006ffc]
+  mov dword [0x00007ffc], eax
 
   ; So it's come to this.  We're in real mode now, and our task now is to
   ; reassemble and boot the kernel.  Hopefully the BIOS services (at least
@@ -109,6 +121,15 @@ _start:
   ; something really strange.  We don't really need interrupts to be
   ; delivered anyway as all we're doing is shuffling tiny pieces of the
   ; kernel and initrd around in RAM before we boot the kernel.
+
+  ; Virtual memory map for when we're in protected mode:
+  ;  0x00001000 - 0x00100000  = identity mapping
+  ;  0x001ff000               = kernel map page directory
+  ;  0x3fe00000               = kernel map page tables
+  ;  (only as much is mapped as actually is used)
+  ;  0x40000000               = kernel, etc.
+  ;  (kernel, initrd, and kernel command line, each separated by
+  ;   an unmapped page)
 
   ; Drop to text mode with a clean screen.
   mov ax, 0x0003
@@ -452,6 +473,11 @@ bios_puthex:
   mov ebx, eax
   mov edi, 8
 
+  mov dword [esp], '0'
+  call bios_putchar
+  mov dword [esp], 'x'
+  call bios_putchar
+
 .printloop:
   rol ebx, 4
   mov al, bl
@@ -470,7 +496,7 @@ bios_puthex:
   jnz .printloop
 
   leave
-  ret  
+  ret
 
 
   ; Runs int 0x10 AH=0x0e with the passed value as AL.

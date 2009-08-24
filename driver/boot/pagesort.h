@@ -15,12 +15,14 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KX_STRING_H
-#define KX_STRING_H
+#ifndef PAGESORT_H
+#define PAGESORT_H
 
-#include <stddef.h>
+#include "bootinfo.h"
 
-int memcmp(const void*, const void*, size_t);
-void* memcpy(void*, const void*, size_t);
+void pagesort_init(struct bootinfo* info);
+void pagesort_verify(void);
+void pagesort_sort(void);
+void pagesort_collapse(void);
 
 #endif

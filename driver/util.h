@@ -18,15 +18,17 @@
 #ifndef KEXEC_DRIVER_UTIL_H
 #define KEXEC_DRIVER_UTIL_H
 
-#include <ddk/ntddk.h>
+#include <stdint.h>
 
 void util_cli(void);
-void util_hlt(void); /* Does not return. */
+void util_hlt(void) KEXEC_NORETURN;
 
 int util_pae_enabled(void);
-DWORD util_get_cr3(void);
-void util_invlpg(DWORD page_address);
+uint32_t util_get_cr3(void);
+void util_invlpg(uint32_t page_address);
 /* Because KeGetCurrentProcessorNumber() epically fails under MinGW. */
-ULONG util_current_processor(void);
+uint32_t util_current_processor(void);
+void util_int3(void);
+void util_reload_cr3(void);
 
 #endif

@@ -18,11 +18,14 @@
 #ifndef CONSOLE_H
 #define CONSOLE_H
 
+#include <stdint.h>
+
 typedef void(*bios_putchar_t)(unsigned char);
 
 void console_init(bios_putchar_t putch);
 
 int putchar(int c);
 void putstr(const char* str);
+void puthex(uint32_t w);
 
 #endif

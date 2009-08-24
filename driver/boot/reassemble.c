@@ -22,30 +22,23 @@
 
 #include "bootinfo.h"
 #include "console.h"
-#include "verify.h"
+#include "pagesort.h"
 
 /* The entry point.  Takes a pointer to the boot info structure and
    a pointer to the character output function.  */
 void _reassemble_start(struct bootinfo* info, bios_putchar_t putch)
 {
-  void* kernel_vbase;
-  void* initrd_vbase;
-  void* cmdline_vbase;
-
-  kernel_vbase = (void*)0x40000000;
-  initrd_vbase = (void*)((uint32_t)(kernel_vbase + info->kernel_size + 4095) & 0xfffff000) + 4096;
-  cmdline_vbase = (void*)((uint32_t)(initrd_vbase + info->initrd_size + 4095) & 0xfffff000) + 4096;
-
   console_init(putch);
 
-  /* Verify the hashes to make sure everything is right so far. */
-  putstr("Verifying kernel integrity...\n");
-  verify_hash(kernel_vbase, info->kernel_size, info->kernel_hash);
-  putstr("Verifying initrd integrity...\n");
-  verify_hash(initrd_vbase, info->initrd_size, info->initrd_hash);
-  putstr("Verifying kernel command line integrity...\n");
-  verify_hash(cmdline_vbase, info->cmdline_size, info->cmdline_hash);
+  pagesort_init(info);
 
-  putstr("\nDereferencing null pointer to test exception handlers.\n");
-  *(uint32_t*)(0x00000000) = 42;
+  /* Sort the kernel pages and the page tables. */
+  pagesort_sort();
+
+  /* Collapse the pages into place. */
+  pagesort_collapse();
+
+  /* Verify the hashes to make sure everything is right so far. */
+  pagesort_verify();
+
 }

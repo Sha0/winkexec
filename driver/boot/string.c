@@ -29,3 +29,16 @@ int memcmp(const void* a, const void* b, size_t len)
 
   return 0;
 }
+
+
+void* memcpy(void* dest, const void* src, size_t len)
+{
+  const unsigned char* a = src;
+  unsigned char* b = dest;
+  size_t i;
+
+  for (i = 0; i < len; i++)
+    b[i] = a[i];
+
+  return dest;
+}

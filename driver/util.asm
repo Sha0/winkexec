@@ -61,3 +61,17 @@ global _util_current_processor
 _util_current_processor:
   movzx eax, byte [fs:0x00000051]
   ret
+
+; A convenient debug breakpoint.
+global _util_int3
+_util_int3:
+  int3
+  ret
+
+; Reload cr3 with the same value it had before.
+; Useful to force a PDPT reload or forget any cached mappings.
+global _util_reload_cr3
+_util_reload_cr3:
+  mov eax, cr3
+  mov cr3, eax
+  ret

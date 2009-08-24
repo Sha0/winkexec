@@ -15,12 +15,13 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef KX_STRING_H
-#define KX_STRING_H
+#include "console.h"
+#include "stdlib.h"
+#include "../util.h"
 
-#include <stddef.h>
-
-int memcmp(const void*, const void*, size_t);
-void* memcpy(void*, const void*, size_t);
-
-#endif
+void KEXEC_NORETURN abort(void)
+{
+  putstr("abort() was called!\n");
+  util_int3();
+  util_hlt();
+}
