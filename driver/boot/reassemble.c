@@ -24,13 +24,16 @@
 #include "console.h"
 #include "pagesort.h"
 
-/* The entry point.  Takes a pointer to the boot info structure and
-   a pointer to the character output function.  */
-void _reassemble_start(struct bootinfo* info, bios_putchar_t putch)
+/* The entry point.  Takes a pointer to the boot info structure,
+   a pointer to the character output function, a pointer to the
+   done-paging callback, and a pointer to the int 0x15 eax=0xe820
+   table.  */
+void _reassemble_start(struct bootinfo* info, bios_putchar_t putch,
+  doneWithPaging_t dwp, struct e820_table* mem_table)
 {
   console_init(putch);
 
-  pagesort_init(info);
+  pagesort_init(info, dwp, mem_table);
 
   /* Sort the kernel pages and the page tables. */
   pagesort_sort();

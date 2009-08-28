@@ -32,7 +32,7 @@ typedef enum _FIRMWARE_REENTRY {
   HalMaximumRoutine,
 } FIRMWARE_REENTRY, *PFIRMWARE_REENTRY;
 
-typedef VOID NTAPI(*halReturnToFirmware_t)(FIRMWARE_REENTRY);
+typedef VOID KEXEC_NORETURN NTAPI(*halReturnToFirmware_t)(FIRMWARE_REENTRY);
 
 static halReturnToFirmware_t real_HalReturnToFirmware;
 
@@ -40,7 +40,7 @@ static halReturnToFirmware_t real_HalReturnToFirmware;
    Drops through if we don't have a kernel to load or if an invalid
    operation type is specified.  The guts of ntoskrnl.exe will be
    tricked into calling this after everything is ready for "reboot."  */
-static VOID NTAPI KexecDoReboot(FIRMWARE_REENTRY RebootType)
+static VOID KEXEC_NORETURN NTAPI KexecDoReboot(FIRMWARE_REENTRY RebootType)
 {
   if (RebootType == HalRebootRoutine && KexecGetBufferSize(&KexecKernel))
     KexecLinuxBoot();

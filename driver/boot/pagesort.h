@@ -20,7 +20,9 @@
 
 #include "bootinfo.h"
 
-void pagesort_init(struct bootinfo* info);
+typedef void(*doneWithPaging_t)(void);
+
+void pagesort_init(struct bootinfo* info, doneWithPaging_t dwp, struct e820_table* mem_table);
 void pagesort_verify(void);
 void pagesort_sort(void);
 void pagesort_collapse(void);

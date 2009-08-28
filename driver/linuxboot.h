@@ -19,8 +19,8 @@
 #define KEXEC_DRIVER_LINUXBOOT_H
 
 #include <ddk/ntddk.h>
+#include <kexec.h>
 
-/* Does not return. */
-void KexecLinuxBoot(void);
+void KexecLinuxBoot(void) KEXEC_NORETURN;
 
 #endif

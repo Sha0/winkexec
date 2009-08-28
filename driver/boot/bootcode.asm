@@ -146,17 +146,25 @@ _start:
   test edx, 0x00000040
   jz noPAE
 
+  ; Build the int 0x15 eax=0xe820 memory map.
+  call build_e820
+
   ; Go into protected mode.
   call realToProt
   bits 32
 
   ; Call the C code to put the kernel and initrd back together.
-  ; Pass it a pointer to the boot information structure
-  ; and a pointer to the character output routine.
+  ; Pass it a pointer to the boot information structure,
+  ; a pointer to the character output routine, a pointer to
+  ; a routine that disables paging and stores the fact that we
+  ; no longer need it, and a pointer to the int 0x15 eax=0xe820
+  ; physical memory map (prefixed with its entry count).
+  push dword e820map_count
+  push dword doneWithPaging
   push dword bios_putchar
   push dword bootinfo
   call c_code
-  add esp, 8
+  add esp, 16
 
   ; Go back into real mode.
   call protToReal
@@ -164,19 +172,19 @@ _start:
 
   ; Say that we got to the end of implemented functionality.
   mov si, stumpmsg
-  call display
-  jmp short cliHlt
+  jmp short kaboom
 
 noPAE:
   mov si, noPAEmsg
-  call display
-  ; fall through to cliHlt
+  ; fall through to kaboom
 
-cliHlt:
+kaboom:
+  call display
   cli
 .hltloop:
   hlt
   jmp short .hltloop
+
 
   ; Display a message on the screen.
   ; Message is at ds:si.
@@ -191,6 +199,46 @@ display:
   mov bx, 0x0007
   int 0x10
   jmp short .readMore
+.done:
+  ret
+
+
+  ; Build the int 0x15 eax=0xe820 memory map.
+  ; Trashes all registers.
+build_e820:
+  xor ebx, ebx
+  mov di, e820map
+
+.fetchAnother:
+  mov eax, 0x0000e820
+  mov ecx, 20
+  mov edx, 0x534d4150
+  int 0x15
+  jc .e820fail
+  cmp eax, 0x534d4150
+  jnz .e820fail
+  cmp ecx, 20
+  jnz .e820fail
+  add di, 20
+  cmp di, bootinfo
+  jnb .e820toobig
+  inc dword [e820map_count]
+  test ebx, ebx
+  jz .done
+  jmp short .fetchAnother
+
+.e820fail:
+  ; Apparently some buggy BIOSes return error instead of clearing
+  ; ebx when we reach the end of the list.
+  cmp dword [e820map_count], 0
+  jnz .done
+  mov si, e820failmsg
+  jmp kaboom
+
+.e820toobig:
+  mov si, e820toobigmsg
+  jmp kaboom
+
 .done:
   ret
 
@@ -244,6 +292,11 @@ realToProt:
   ; Apply the protected mode interrupt descriptor table.
   lidt [idttag]
 
+  ; Bypass the activation of paging if it's no longer necessary.
+  mov al, byte [dont_need_paging_anymore]
+  test al, al
+  jnz .skipPaging
+
   ; Turn on PAE.
   mov eax, cr4
   or al, 0x20
@@ -255,6 +308,7 @@ realToProt:
   mov eax, cr0
   or eax, 0x80000000
   mov cr0, eax
+.skipPaging:
 
   ; Return to the saved return address.
   movzx eax, dx
@@ -531,18 +585,65 @@ bios_putchar:
   ret
 
 
+  ; Disable paging and store the fact that we don't need it anymore.
+  ; C prototype: void done_with_paging(void);
+  ;
+  ; We have this because at a specific point the C code doesn't need
+  ; paging to be activated anymore.  Paging is only used to bring the
+  ; kernel pages together into physically contiguous memory.  We can
+  ; do all the rest with just plain old unpaged physical memory access;
+  ; in fact, we need it that way once we've reassembled the kernel so
+  ; we can move stuff around freely in physical memory to prepare for
+  ; boot.  If we don't store the fact that we've reached that point,
+  ; though, paging will be activated again as soon as we return from
+  ; something that drops to real mode, and the C code will almost
+  ; surely attempt to access some unmapped piece of memory, and the
+  ; resulting page fault will kill us.
+  align 16
+doneWithPaging:
+  bits 32
+
+  push ebp
+  mov ebp, esp
+
+  ; Turn off paging...
+  mov eax, cr0
+  and eax, 0x7fffffff
+  mov cr0, eax
+
+  ; ...reset the TLBs...
+  xor eax, eax
+  mov cr3, eax
+
+  ; ...and turn off PAE.
+  mov eax, cr4
+  and al, 0xdf
+  mov cr4, eax
+
+  ; Store the fact that we did it, and return.
+  mov byte [dont_need_paging_anymore], 1
+
+  leave
+  ret
+
+
 ; Variables
 align 4
 real_stack_pointer dw 0
 real_stack_segment dw 0
 prot_stack_pointer dd 0
 prot_stack_segment dw 0
+dont_need_paging_anymore db 0
 
 ; Strings
 banner db 'WinKexec: Linux bootloader implemented as a Windows device driver',\
   0x0d,0x0a,'Copyright (C) 2008-2009 John Stumpo',0x0d,0x0a,0x0d,0x0a,0x00
 noPAEmsg db 'This processor does not support PAE.',0x0d,0x0a,\
   'PAE support is required in order to use WinKexec.',0x0d,0x0a,0x00
+e820failmsg db 'The BIOS does not support int 0x15 eax=0xe820.',0x0d,0x0a,\
+  'WinKexec requires this function to work.',0x0d,0x0a,0x00
+e820toobigmsg db 'The memory table returned by int 0x15 eax=0xe820',0x0d,0x0a,\
+  'overflowed the buffer allocated to contain it.',0x0d,0x0a,0x00
 stumpmsg db 'This program is a stump.  You can help by expanding it.',\
   0x0d,0x0a,0x00  ; in honor of Kyle
 errcode_separator db ', errcode=',0x00
@@ -663,6 +764,13 @@ page_directory_pointer_table:
   pdpt_entry1 dq 0x0000000000000000
   pdpt_entry2 dq 0x0000000000000000
   pdpt_entry3 dq 0x0000000000000000
+
+; Space for building the int 0x15 eax=0xe820 memory map.
+; Make sure we leave enough space for 32 entries, but the code will
+; be willing to go farther (though it will not overwrite bootinfo),
+; so this has to be the last thing before we pad up to bootinfo.
+e820map_count dd 0
+e820map times (20 * 32) db 0x00
 
   times (4016 - ($ - $$)) db 0x00  ; pad to 4KB minus 80 bytes
 

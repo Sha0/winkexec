@@ -19,7 +19,11 @@
 #define KX_STDLIB_H
 
 #include <kexec.h>
+#include <stddef.h>
 
 void KEXEC_NORETURN abort(void);
+
+void qsort(void* base, size_t num, size_t size,
+  int(*compare)(const void*, const void*));
 
 #endif

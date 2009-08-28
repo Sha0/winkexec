@@ -17,6 +17,7 @@
 
 #include "console.h"
 #include "stdlib.h"
+#include "string.h"
 #include "../util.h"
 
 void KEXEC_NORETURN abort(void)
@@ -24,4 +25,33 @@ void KEXEC_NORETURN abort(void)
   putstr("abort() was called!\n");
   util_int3();
   util_hlt();
+}
+
+
+/* Not quicksort (in the interest of stack space) but insertion sort.
+   Sure, it's O(n^2) in time, but we're not going to be sorting huge
+   lists with it.  */
+void qsort(void* base, size_t num, size_t size,
+  int(*compare)(const void*, const void*))
+{
+  size_t pos1;
+  size_t pos2;
+  unsigned char buf[32];
+
+  if (size > 32) {
+    putstr("qsort: Maximum element size exceeded\n");
+    abort();
+  }
+
+  for (pos1 = 1; pos1 < num; pos1++) {
+    for (pos2 = pos1;
+         compare(base + ((pos2 - 1) * size),
+                 base + ( pos2      * size)) > 0 && pos2 > 0;
+         pos2--)
+    {
+      memcpy(buf, base + ((pos2 - 1) * size), size);
+      memcpy(base + ((pos2 - 1) * size), base + (pos2 * size), size);
+      memcpy(base + (pos2 * size), buf, size);
+    }
+  }
 }

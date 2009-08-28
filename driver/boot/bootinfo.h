@@ -33,4 +33,15 @@ struct bootinfo {
   uint64_t page_directory_ptr;
 } KEXEC_PACKED;
 
+struct e820 {
+  uint64_t base;
+  uint64_t size;
+  uint32_t type;
+} KEXEC_PACKED;
+
+struct e820_table {
+  uint32_t count;
+  struct e820 entries[];
+} KEXEC_PACKED;
+
 #endif

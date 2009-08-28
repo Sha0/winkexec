@@ -31,6 +31,9 @@ static uint64_t* kmap_pagedir_end;
 static uint64_t* kmap_pagetables;
 static uint64_t* kmap_pagetables_end;
 static void* scratch_page;
+static struct e820_table* e820;
+
+static doneWithPaging_t doneWithPaging;
 
 #ifdef DEBUG
 #define DEBUG_OUTPUT(a) putstr(#a " = "); puthex((uint32_t)a); putchar('\n');
@@ -38,7 +41,21 @@ static void* scratch_page;
 #define DEBUG_OUTPUT(a) /*nothing*/
 #endif
 
-void pagesort_init(struct bootinfo* info)
+/* For qsort(). */
+static int e820_compare(const void* lhs, const void* rhs)
+{
+  const struct e820* l = (const struct e820*)lhs;
+  const struct e820* r = (const struct e820*)rhs;
+  if (l->base < r->base)
+    return -1;
+  else if (l->base == r->base)
+    return 0;
+  else
+    return 1;
+}
+
+
+void pagesort_init(struct bootinfo* info, doneWithPaging_t dwp, struct e820_table* mem_table)
 {
   kernel_vbase = (void*)0x40000000;
   initrd_vbase = (void*)((uint32_t)(kernel_vbase + info->kernel_size + 4095) & 0xfffff000) + 4096;
@@ -59,6 +76,27 @@ void pagesort_init(struct bootinfo* info)
   DEBUG_OUTPUT(scratch_page);
 
   boot_info = info;
+  doneWithPaging = dwp;
+  e820 = mem_table;
+  qsort(e820->entries, e820->count, sizeof(struct e820), e820_compare);
+
+#if 0
+  size_t i;
+  putstr("e820 map:\n");
+  for (i = 0; i < e820->count; i++) {
+    putstr("base=");
+    puthex((uint32_t)(e820->entries[i].base >> 32));
+    putchar('`');
+    puthex((uint32_t)(e820->entries[i].base & 0xffffffff));
+    putstr("  size=");
+    puthex((uint32_t)(e820->entries[i].size >> 32));
+    putchar('`');
+    puthex((uint32_t)(e820->entries[i].size & 0xffffffff));
+    putstr("  type=");
+    puthex(e820->entries[i].type);
+    putchar('\n');
+  }
+#endif
 }
 
 
@@ -221,7 +259,9 @@ void pagesort_sort(void)
 }
 
 
-/* Collapse the sorted pages into place in memory at 0x00100000. */
+/* Collapse the sorted pages into place in memory at 0x00100000 and
+   invoke the done-paging callback.  Then fix up our pointers to the
+   physical addresses.  */
 void pagesort_collapse(void)
 {
   uint32_t pdpt_addr;
@@ -275,4 +315,9 @@ void pagesort_collapse(void)
     dest += 4096;
   }
 
+  doneWithPaging();
+
+  kernel_vbase -= (0x40000000 - 0x00100000);
+  initrd_vbase -= (0x40000000 - 0x00100000);
+  cmdline_vbase -= (0x40000000 - 0x00100000);
 }

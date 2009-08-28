@@ -29,7 +29,7 @@
 #include "boot/bootinfo.h"
 
 /* Bail out of the boot process - all we can do now is BSoD... */
-static void BootPanic(PCHAR msg, DWORD code1, DWORD code2,
+static void KEXEC_NORETURN BootPanic(PCHAR msg, DWORD code1, DWORD code2,
   DWORD code3, DWORD code4)
 {
   DbgPrint("kexec: *** PANIC: %s\n", msg);
@@ -73,22 +73,20 @@ static void WriteKernelPointer(DWORD** pd KEXEC_UNUSED,
 
    Does not return.
  */
-static void DoLinuxBoot(void)
+static void KEXEC_NORETURN DoLinuxBoot(void)
 {
   /* Here's how things are going to go:
-     At physical address 0x00010000, we will start building a list of the
+     We're going to build PAE page tables that point to the
        physical addresses of 4K pages that hold the kernel, initrd, and
-       kernel command line, with null pointers in between.
-       (We will use 64-bit pointers just in case of PAE.)
-       Maximum length: 65536 pointers (using up to address 0x00090000),
-         allowing up to 256 MB total kernel+initrd size.
-
-       (Addendum: That cake is a lie, but for now it's still the way we
-        do things.  Windows seems to like to put the page directory there,
-        and when we encroach upon it [by way of overwriting it with garbage]
-        Bad Things(tm) tend to happen, like triple faults.  The code is
-        currently being prepared to generate page tables instead for the
-        kernel map.)
+       kernel command line, with unmapped pages in between.  We will also
+       build a PAE page directory pointing to the physical addresses of the
+       page tables so that we can communicate the physical address of the
+       page directory to the boot code, it can put it into its PDPT, and
+       we can have nice easy access to the kernel data using virtual
+       addresses before we put it back together in contiguous physical
+       memory.
+       Maximum length: 1 PAE page directory worth of virtual
+         address space, which amounts to 1 GB.
 
      At physical address 0x00008000, we will copy the code that will be used
        to escape from protected mode, set things up for the boot, and
@@ -192,6 +190,7 @@ static void DoLinuxBoot(void)
     }
     page_directory_pointer_table[0] |= 0x00000001;
     page_directory_pointer_table[1] &= 0x7fffffff;
+    util_reload_cr3();  /* so a modification to the PDPT takes effect */
 
     /* Where is the page directory? */
     addr.HighPart = page_directory_pointer_table[1];
@@ -258,7 +257,7 @@ static void DoLinuxBoot(void)
 /* A kernel thread routine.
    We use this to bring down all but the first processor.
    Does not return.  */
-static VOID KexecThreadProc(PVOID Context KEXEC_UNUSED)
+static VOID KEXEC_NORETURN KexecThreadProc(PVOID Context KEXEC_UNUSED)
 {
   HANDLE hThread;
   ULONG currentProcessor;
@@ -288,7 +287,7 @@ static VOID KexecThreadProc(PVOID Context KEXEC_UNUSED)
 
 /* Initiate the Linux boot process.
    Does not return.  */
-void KexecLinuxBoot(void)
+void KEXEC_NORETURN KexecLinuxBoot(void)
 {
   KexecThreadProc(NULL);
 }
