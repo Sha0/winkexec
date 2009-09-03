@@ -26,5 +26,6 @@ void pagesort_init(struct bootinfo* info, doneWithPaging_t dwp, struct e820_tabl
 void pagesort_verify(void);
 void pagesort_sort(void);
 void pagesort_collapse(void);
+void pagesort_prepare_for_boot(void);
 
 #endif

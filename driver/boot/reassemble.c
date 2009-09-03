@@ -44,4 +44,7 @@ void _reassemble_start(struct bootinfo* info, bios_putchar_t putch,
   /* Verify the hashes to make sure everything is right so far. */
   pagesort_verify();
 
+  /* Prepare the initrd and the real mode segment. */
+  pagesort_prepare_for_boot();
+
 }

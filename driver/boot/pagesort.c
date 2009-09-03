@@ -77,6 +77,8 @@ void pagesort_init(struct bootinfo* info, doneWithPaging_t dwp, struct e820_tabl
 
   boot_info = info;
   doneWithPaging = dwp;
+
+  /* Sort the e820 table. */
   e820 = mem_table;
   qsort(e820->entries, e820->count, sizeof(struct e820), e820_compare);
 
@@ -271,8 +273,6 @@ void pagesort_collapse(void)
   /* First, move the kernel page directory to the scratch page
      so we don't accidentally hit it.  */
   memcpy(scratch_page, kmap_pagedir, 4096);
-
-  /* AT&T syntax makes me vomit. */
   pdpt_addr = util_get_cr3();
   *(uint64_t*)(pdpt_addr + 8) = (uint64_t)((uint32_t)scratch_page | 0x00000001);
   /* Force the PDPT to be reloaded by reloading cr3. */
@@ -320,4 +320,98 @@ void pagesort_collapse(void)
   kernel_vbase -= (0x40000000 - 0x00100000);
   initrd_vbase -= (0x40000000 - 0x00100000);
   cmdline_vbase -= (0x40000000 - 0x00100000);
+}
+
+
+/* Set up the real mode segment used to boot the kernel.  This does
+   everything needed to get the kernel ready to go, including filling
+   in the header structures.  This makes the copy of the cmdline after
+   the initrd not matter anymore, allowing us to shift the initrd up
+   afterward without accounting for the cmdline.  The segment is built
+   at 0x00080000, so the real mode code can jump to 0x8020:0x0000.  */
+void pagesort_prepare_for_boot(void)
+{
+  int rmcode_size;
+  uint16_t proto;
+  uint32_t cmdlimit;
+  int i;
+  uint32_t initrd_limit;
+  uint32_t initrd_loadaddr;
+
+  rmcode_size = 512 * (1 + *(uint8_t*)(kernel_vbase + 0x01f1));
+  if (rmcode_size == 0)
+    rmcode_size = 512 * 5;
+  memcpy((void*)0x00080000, kernel_vbase, rmcode_size);
+  memmove((void*)0x00100000, kernel_vbase + rmcode_size, boot_info->kernel_size - rmcode_size);
+
+  /* Now we can forget about the 32-or-64-bit meat of the kernel and just
+     reference header fields relative to 0x00080000, where we put
+     the 16-bit setup code.  Let's fill in some fields while we're here.  */
+  if (*(uint16_t*)0x000801fe != 0xaa55 || *(uint32_t*)0x00080202 != 0x53726448) {
+    putstr("Invalid magic numbers in kernel.\n");
+    abort();
+  }
+
+  proto = *(uint16_t*)0x00080206;
+  if (proto < 0x0202) {
+    putstr("Kernel boot protocol is too old (must be at least 2.02).\n");
+    putstr("Any released 2.4 or 2.6 kernel should do the trick.\n");
+    abort();
+  }
+
+  /* If we get an ID from hpa, here is its place to shine. */
+  *(uint8_t*)0x00080210 = 0xff;  /* type_of_loader */
+
+  /* Set CAN_USE_HEAP and the heap_end_ptr. */
+  *(uint8_t*)0x00080211 |= 0x80;
+  *(uint16_t*)0x00080224 = 0xde00;
+
+  /* Check the command line length. */
+  if (proto >= 0x0206)
+    cmdlimit = *(uint32_t*)0x00080238;
+  else
+    cmdlimit = 255;
+  if (boot_info->cmdline_size > cmdlimit) {
+    putstr("Kernel command line is too long for the kernel given.\n");
+    abort();
+  }
+
+  /* Set the command line. */
+  memcpy((void*)0x0008e000, cmdline_vbase, boot_info->cmdline_size);
+  cmdline_vbase = (void*)0x0008e000;
+  *(uint32_t*)0x00080228 = 0x0008e000;
+
+  /* Find a big enough block of usable RAM in the e820 table
+     and put the initrd there.  But first make sure there
+     actually *is* an initrd.  */
+  if (boot_info->initrd_size == 0)
+    return;
+
+  /* It's the highest safe byte that is reported; a
+     boundary is easier to work with.  */
+  if (proto >= 0x0203)
+    initrd_limit = 1 + *(uint32_t*)0x0008022c;
+  else
+    initrd_limit = 0x38000000;
+
+  /* Look backwards through the e820 table for a suitable location. */
+  for (i = e820->count - 1; i >= 0; i--) {
+    if (e820->entries[i].type != 1 ||
+        e820->entries[i].base > (initrd_limit - boot_info->initrd_size))
+      continue;
+
+    if (e820->entries[i].base + e820->entries[i].size > initrd_limit)
+      initrd_loadaddr = initrd_limit - boot_info->initrd_size;
+    else
+      initrd_loadaddr = e820->entries[i].base + e820->entries[i].size - boot_info->initrd_size;
+
+    memmove((void*)initrd_loadaddr, initrd_vbase, boot_info->initrd_size);
+    initrd_vbase = (void*)initrd_loadaddr;
+    *(uint32_t*)0x00080218 = initrd_loadaddr;
+    *(uint32_t*)0x0008021c = boot_info->initrd_size;
+    return;
+  }
+  putstr("No suitable memory location found for initrd.\n");
+  abort();
+
 }

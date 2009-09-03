@@ -31,14 +31,19 @@ int memcmp(const void* a, const void* b, size_t len)
 }
 
 
-void* memcpy(void* dest, const void* src, size_t len)
+void* memmove(void* dest, const void* src, size_t len)
 {
   const unsigned char* a = src;
   unsigned char* b = dest;
   size_t i;
 
-  for (i = 0; i < len; i++)
-    b[i] = a[i];
+  if (b < a) {
+    for (i = 0; i < len; i++)
+      b[i] = a[i];
+  } else {
+    for (i = len; i > 0; i--)
+      b[i-1] = a[i-1];
+  }
 
   return dest;
 }

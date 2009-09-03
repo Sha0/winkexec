@@ -144,7 +144,10 @@ _start:
   mov eax, 0x00000001
   cpuid
   test edx, 0x00000040
-  jz noPAE
+  jnz .havePAE
+  mov si, noPAEmsg
+  jmp short kaboom
+.havePAE:
 
   ; Build the int 0x15 eax=0xe820 memory map.
   call build_e820
@@ -170,14 +173,19 @@ _start:
   call protToReal
   bits 16
 
-  ; Say that we got to the end of implemented functionality.
-  mov si, stumpmsg
-  jmp short kaboom
+  ; Invoke the kernel!
+  mov ax, 0x8000
+  mov ds, ax
+  mov es, ax
+  mov fs, ax
+  mov gs, ax
+  mov ss, ax
+  mov sp, 0xdffe
+  jmp 0x8020:0x0000
 
-noPAE:
-  mov si, noPAEmsg
-  ; fall through to kaboom
 
+  ; Show an error message and halt.
+  ; Message is at ds:si.
 kaboom:
   call display
   cli
