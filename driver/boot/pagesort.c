@@ -404,6 +404,7 @@ void pagesort_prepare_for_boot(void)
       initrd_loadaddr = initrd_limit - boot_info->initrd_size;
     else
       initrd_loadaddr = e820->entries[i].base + e820->entries[i].size - boot_info->initrd_size;
+    initrd_loadaddr &= 0xfffff000;  /* round down to multiple of 4 KB */
 
     memmove((void*)initrd_loadaddr, initrd_vbase, boot_info->initrd_size);
     initrd_vbase = (void*)initrd_loadaddr;

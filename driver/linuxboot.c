@@ -179,7 +179,7 @@ static void KEXEC_NORETURN DoLinuxBoot(void)
 
     /* Where is the page directory pointer table? */
     addr.HighPart = 0x00000000;
-    addr.LowPart = util_get_cr3() & 0xfffff000;
+    addr.LowPart = util_get_cr3() & 0xffffffe0;
     page_directory_pointer_table = MmMapIoSpace(addr, 4096, MmNonCached);
 
     /* If the page directory isn't present, use
