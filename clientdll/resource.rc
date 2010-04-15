@@ -25,8 +25,8 @@
 LANGUAGE 9, 1
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 1, 0, 0, SVN_REVISION
- PRODUCTVERSION 1, 0, 0, SVN_REVISION
+ FILEVERSION RES_VERSION
+ PRODUCTVERSION RES_VERSION
  FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
  FILEOS VOS_NT_WINDOWS32
  FILETYPE VFT_DLL
@@ -38,12 +38,12 @@ BEGIN
     BEGIN
       VALUE "CompanyName", "John Stumpo"
       VALUE "FileDescription", "Kexec for Windows common functions"
-      VALUE "FileVersion", "1.0 (r" SVN_REVISION_STR ")"
+      VALUE "FileVersion", VERSION_STR
       VALUE "InternalName", "KexecCommon.dll"
       VALUE "LegalCopyright", "\251 2008-2009 John Stumpo.  GNU GPL v3 or later."
       VALUE "OriginalFilename", "KexecCommon.dll"
       VALUE "ProductName", "WinKexec"
-      VALUE "ProductVersion", "1.0 (r" SVN_REVISION_STR ")"
+      VALUE "ProductVersion", VERSION_STR
     END
   END
   BLOCK "VarFileInfo"
@@ -61,7 +61,7 @@ BEGIN
 
   GROUPBOX "About WinKexec", 50, 7, 7, 246, 103
 
-  LTEXT "WinKexec version 1.0, svn revision " SVN_REVISION_STR "\r\n"
+  LTEXT "WinKexec version " VERSION_STR "\r\n"
         "Copyright \251 2008-2009 John Stumpo\r\n"
         "\r\n"
         "WinKexec is free software under the GNU General Public License version "

@@ -19,7 +19,7 @@
 
 !include "MUI2.nsh"
 
-Name "WinKexec r${SVN_REVISION}"
+Name "WinKexec"
 OutFile KexecSetup.exe
 
 InstallDir "$PROGRAMFILES\WinKexec"
@@ -49,15 +49,15 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "1.0.0.${SVN_REVISION}"
+VIProductVersion "${RES_VERSION_STR}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "WinKexec Setup"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${SVN_REVISION})"
+VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION_STR}"
 VIAddVersionKey /LANG=1033 "InternalName" "KexecSetup.exe"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008-2009 John Stumpo.  GNU GPL v3 or later."
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecSetup.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${SVN_REVISION})"
+VIAddVersionKey /LANG=1033 "ProductVersion" "${VERSION_STR}"
 
 ShowInstDetails show
 ShowUninstDetails show
@@ -67,7 +67,7 @@ Function .onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${SVN_REVISION} Setup is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec Setup is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -76,7 +76,7 @@ Function un.onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecUninstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "WinKexec r${SVN_REVISION} Uninstall is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "WinKexec Uninstall is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -110,7 +110,7 @@ DoneKexecUninstall:
   # Make our InstallDirRegKey (and thus, the uninstaller!) useful.
   WriteRegStr HKLM "Software\WinKexec" InstallRoot $INSTDIR
   # Add us to Add/Remove Programs.
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec (r${SVN_REVISION})"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "DisplayName" "WinKexec ${VERSION_STR}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "UninstallString" "$\"$INSTDIR\KexecUninstall.exe$\""
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "InstallLocation" "$INSTDIR"
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\WinKexec" "NoModify" 1

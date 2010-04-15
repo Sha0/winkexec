@@ -18,7 +18,7 @@
 
 !include "MUI2.nsh"
 
-Name "Kexec Driver r${SVN_REVISION}"
+Name "Kexec Driver"
 OutFile KexecDriver.exe
 
 SetCompressor zlib
@@ -43,15 +43,15 @@ RequestExecutionLevel admin
 
 !insertmacro MUI_LANGUAGE "English"
 
-VIProductVersion "1.0.0.${SVN_REVISION}"
+VIProductVersion "${RES_VERSION_STR}"
 VIAddVersionKey /LANG=1033 "CompanyName" "John Stumpo"
 VIAddVersionKey /LANG=1033 "FileDescription" "Kexec Driver Setup"
-VIAddVersionKey /LANG=1033 "FileVersion" "1.0 (r${SVN_REVISION})"
+VIAddVersionKey /LANG=1033 "FileVersion" "${VERSION_STR}"
 VIAddVersionKey /LANG=1033 "InternalName" "KexecDriver.exe"
 VIAddVersionKey /LANG=1033 "LegalCopyright" "© 2008-2009 John Stumpo.  GNU GPL v3 or later."
 VIAddVersionKey /LANG=1033 "OriginalFilename" "KexecDriver.exe"
 VIAddVersionKey /LANG=1033 "ProductName" "WinKexec"
-VIAddVersionKey /LANG=1033 "ProductVersion" "1.0 (r${SVN_REVISION})"
+VIAddVersionKey /LANG=1033 "ProductVersion" "${VERSION_STR}"
 
 ShowInstDetails show
 ShowUninstDetails show
@@ -61,7 +61,7 @@ Function .onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecDriverInstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver r${SVN_REVISION} Setup is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver Setup is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -70,7 +70,7 @@ Function un.onInit
   System::Call 'kernel32::CreateMutexA(i 0, i 0, t "KexecDriverUninstallerMutex") i .r1 ?e'
   Pop $R0
   StrCmp $R0 0 +3
-    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver r${SVN_REVISION} Uninstall is already running." /SD IDOK
+    MessageBox MB_OK|MB_ICONSTOP "Kexec Driver Uninstall is already running." /SD IDOK
     Abort
 FunctionEnd
 
@@ -89,7 +89,7 @@ Section "Kexec"
   # Write the uninstaller.
   WriteUninstaller "$SYSDIR\KexecDriverUninstall.exe"
   # Add us to Add/Remove Programs.
-  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "DisplayName" "Kexec Driver (r${SVN_REVISION})"
+  WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "DisplayName" "Kexec Driver ${VERSION_STR}"
   WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "UninstallString" "$\"$SYSDIR\KexecDriverUninstall.exe$\""
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "NoModify" 1
   WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\Kexec" "NoRepair" 1

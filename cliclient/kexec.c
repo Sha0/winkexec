@@ -272,7 +272,7 @@ static void usage()
 {
   fprintf(stderr, "%s",
 "\n\
-WinKexec: kexec for Windows (v1.0, svn revision " SVN_REVISION_STR ")\n\
+WinKexec: kexec for Windows, version " VERSION_STR "\n\
 Copyright (C) 2008-2009 John Stumpo\n\
 \n\
 This program is free software; you may redistribute or modify it under the\n\
