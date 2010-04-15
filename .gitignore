@@ -1,0 +1,10 @@
+revtag/revtag.h
+revtag/revtag.nsh
+*.o
+*.exe
+*.dll
+*.sys
+*.lib
+*.bin
+driver/kexec.inf
+driver/boot/bootcode.h
